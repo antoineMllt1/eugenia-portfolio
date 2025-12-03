@@ -1,0 +1,157 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Heart } from 'lucide-react'
+
+interface PublicProfileDialogProps {
+    userId: string | null
+    isOpen: boolean
+    onClose: () => void
+}
+
+interface ProfileData {
+    id: string
+    username: string
+    full_name: string
+    avatar_url: string
+    bio?: string
+    course?: string
+}
+
+interface ProjectPost {
+    id: string
+    title: string
+    images: string[]
+    likes_count: { count: number }[]
+}
+
+export function PublicProfileDialog({ userId, isOpen, onClose }: PublicProfileDialogProps) {
+    const [profile, setProfile] = useState<ProfileData | null>(null)
+    const [projects, setProjects] = useState<ProjectPost[]>([])
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (userId && isOpen) {
+            fetchProfileData()
+        }
+    }, [userId, isOpen])
+
+    const fetchProfileData = async () => {
+        if (!userId) return
+        setLoading(true)
+        try {
+            // Fetch Profile
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single()
+
+            if (profileError) throw profileError
+            setProfile(profileData)
+
+            // Fetch Projects
+            const { data: projectsData, error: projectsError } = await supabase
+                .from('posts')
+                .select(`
+                    id,
+                    title,
+                    images,
+                    likes_count:likes(count)
+                `)
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+
+            if (projectsError) throw projectsError
+            setProjects(projectsData || [])
+
+        } catch (error) {
+            console.error('Error fetching public profile:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (!profile && !loading) return null
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col p-0 gap-0">
+                <DialogHeader className="p-6 pb-2">
+                    <DialogTitle>Student Profile</DialogTitle>
+                </DialogHeader>
+
+                <ScrollArea className="flex-1 p-6 pt-2">
+                    {loading ? (
+                        <div className="flex justify-center py-8">Loading...</div>
+                    ) : (
+                        <div className="space-y-8">
+                            {/* Header */}
+                            <div className="flex items-start gap-6">
+                                <Avatar className="w-24 h-24 border-2 border-primary/10">
+                                    <AvatarImage src={profile?.avatar_url} />
+                                    <AvatarFallback>{profile?.full_name?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 space-y-2">
+                                    <div>
+                                        <h2 className="text-2xl font-bold">{profile?.full_name}</h2>
+                                        <p className="text-muted-foreground">@{profile?.username}</p>
+                                    </div>
+
+                                    {profile?.course && (
+                                        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+                                            {profile.course}
+                                        </div>
+                                    )}
+
+                                    {profile?.bio && (
+                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                            {profile.bio}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Projects Grid */}
+                            <div>
+                                <h3 className="text-lg font-semibold mb-4">Projects</h3>
+                                {projects.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {projects.map((project) => (
+                                            <div key={project.id} className="group relative aspect-video rounded-lg overflow-hidden bg-muted border">
+                                                {project.images?.[0] ? (
+                                                    <img
+                                                        src={project.images[0]}
+                                                        alt={project.title}
+                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                        No Image
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-4 text-center">
+                                                    <p className="font-bold truncate w-full">{project.title}</p>
+                                                    <div className="flex items-center gap-1 mt-2 text-sm">
+                                                        <Heart className="w-4 h-4 fill-white" />
+                                                        <span>{project.likes_count?.[0]?.count || 0}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-12 text-muted-foreground bg-muted/50 rounded-lg border border-dashed">
+                                        No projects yet
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    )
+}
