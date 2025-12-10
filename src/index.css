@@ -4,86 +4,193 @@
 
 @custom-variant dark (&:is(.dark *));
 
-:root {
-  --card: #ffffff;
-  --ring: #e05d38;
+/* ===================================
+   EUGENIA SCHOOL - MULTI-THEME SYSTEM
+   Aesthetic: 21st.dev / Clean Portfolio
+   =================================== */
+
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease;
+}
+
+/* ===================================
+   THEME 1: LIGHT MODE (Default)
+   =================================== */
+:root,
+html[data-theme="light"] {
+  --primary-brand: #ed3d66;
+  --primary-hover: #c02e50;
+  --accent-light: rgba(237, 61, 102, 0.08);
+  --gradient-brand: linear-gradient(135deg, #ed3d66 0%, #f97316 100%);
+
+  --bg-app: #FAFAFA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --border-subtle: #E2E8F0;
+
+  --radius-xl: 24px;
+  --radius-md: 12px;
+  --radius-full: 9999px;
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 10px 25px -5px rgba(237, 61, 102, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-effect: blur(12px) saturate(180%);
+
+  /* Tailwind mapping */
+  --card: var(--bg-card);
+  --ring: var(--primary-brand);
   --input: #f4f5f7;
   --muted: #f9fafb;
-  --accent: #d6e4f0;
-  --border: #dcdfe2;
-  --radius: 0.75rem;
-  --chart-1: #86a7c8;
-  --chart-2: #eea591;
-  --chart-3: #5a7ca6;
-  --chart-4: #466494;
-  --chart-5: #334c82;
-  --popover: #ffffff;
-  --primary: #e05d38;
-  --sidebar: #dddfe2;
-  --font-mono: JetBrains Mono, monospace;
-  --font-sans: Inter, sans-serif;
+  --accent: var(--accent-light);
+  --border: var(--border-subtle);
+  --radius: var(--radius-md);
+  --popover: var(--bg-card);
+  --primary: var(--primary-brand);
+  --sidebar: #f8fafc;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
   --secondary: #f3f4f6;
-  --background: #e8ebed;
-  --font-serif: Source Serif 4, serif;
-  --foreground: #333333;
+  --background: var(--bg-app);
+  --foreground: var(--text-main);
   --destructive: #ef4444;
-  --shadow-blur: 3px;
-  --shadow-color: hsl(0 0% 0%);
-  --sidebar-ring: #e05d38;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --sidebar-accent: #d6e4f0;
-  --sidebar-border: #e5e7eb;
-  --card-foreground: #333333;
-  --shadow-offset-x: 0px;
-  --shadow-offset-y: 1px;
-  --sidebar-primary: #e05d38;
-  --muted-foreground: #6b7280;
-  --accent-foreground: #1e3a8a;
-  --popover-foreground: #333333;
+  --sidebar-ring: var(--primary-brand);
+  --sidebar-accent: var(--accent-light);
+  --sidebar-border: var(--border-subtle);
+  --card-foreground: var(--text-main);
+  --sidebar-primary: var(--primary-brand);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: var(--primary-brand);
+  --popover-foreground: var(--text-main);
   --primary-foreground: #ffffff;
-  --sidebar-foreground: #333333;
-  --secondary-foreground: #4b5563;
+  --sidebar-foreground: var(--text-main);
+  --secondary-foreground: var(--text-muted);
   --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #1e3a8a;
+  --sidebar-accent-foreground: var(--primary-brand);
   --sidebar-primary-foreground: #ffffff;
 }
 
+/* ===================================
+   THEME 2: DARK MODE (Modern Slate)
+   =================================== */
+html[data-theme="dark"],
 .dark {
-  --card: #2a3040;
-  --ring: #e05d38;
-  --input: #3d4354;
-  --muted: #2a303e;
-  --accent: #2a3656;
-  --border: #3d4354;
-  --chart-1: #86a7c8;
-  --chart-2: #e6a08f;
-  --chart-3: #5a7ca6;
-  --chart-4: #466494;
-  --chart-5: #334c82;
-  --popover: #262b38;
-  --primary: #e05d38;
-  --sidebar: #2a303f;
-  --secondary: #2a303e;
-  --background: #1c2433;
-  --foreground: #e5e5e5;
+  --primary-brand: #ed3d66;
+  --primary-hover: #f85a7e;
+  --accent-light: rgba(237, 61, 102, 0.15);
+  --gradient-brand: linear-gradient(135deg, #ed3d66 0%, #f97316 100%);
+
+  --bg-app: #0B1120;
+  --bg-card: #1E293B;
+  --bg-elevated: #283548;
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --border-subtle: #334155;
+
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 10px 30px -5px rgba(237, 61, 102, 0.25);
+  --glass-bg: rgba(30, 41, 59, 0.8);
+  --glass-border: rgba(51, 65, 85, 0.5);
+
+  --card: var(--bg-card);
+  --ring: var(--primary-brand);
+  --input: #1e293b;
+  --muted: #1e293b;
+  --accent: var(--accent-light);
+  --border: var(--border-subtle);
+  --popover: var(--bg-card);
+  --primary: var(--primary-brand);
+  --sidebar: #0f1318;
+  --secondary: #1e293b;
+  --background: var(--bg-app);
+  --foreground: var(--text-main);
   --destructive: #ef4444;
-  --sidebar-ring: #e05d38;
-  --sidebar-accent: #2a3656;
-  --sidebar-border: #3d4354;
-  --card-foreground: #e5e5e5;
-  --sidebar-primary: #e05d38;
-  --muted-foreground: #a3a3a3;
-  --accent-foreground: #bfdbfe;
-  --popover-foreground: #e5e5e5;
+  --sidebar-ring: var(--primary-brand);
+  --sidebar-accent: var(--accent-light);
+  --sidebar-border: var(--border-subtle);
+  --card-foreground: var(--text-main);
+  --sidebar-primary: var(--primary-brand);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: #fecdd3;
+  --popover-foreground: var(--text-main);
   --primary-foreground: #ffffff;
-  --sidebar-foreground: #e5e5e5;
-  --secondary-foreground: #e5e5e5;
+  --sidebar-foreground: var(--text-main);
+  --secondary-foreground: var(--text-muted);
   --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: #bfdbfe;
+  --sidebar-accent-foreground: #fecdd3;
   --sidebar-primary-foreground: #ffffff;
 }
 
+/* ===================================
+   THEME 3: EUGENIA BRAND MODE (Energy)
+   =================================== */
+html[data-theme="eugenia"] {
+  --primary-brand: #ed3d66;
+  --primary-hover: #ff6b8a;
+  --accent-light: rgba(249, 115, 22, 0.2);
+  --gradient-brand: linear-gradient(135deg, #ed3d66 0%, #f97316 100%);
+
+  --bg-app: #0f0508;
+  --bg-card: rgba(42, 10, 18, 0.6);
+  --bg-elevated: rgba(60, 15, 25, 0.8);
+  --text-main: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --border-subtle: rgba(237, 61, 102, 0.3);
+
+  --shadow-soft: 0 4px 20px -2px rgba(237, 61, 102, 0.2);
+  --shadow-hover: 0 10px 40px -5px rgba(249, 115, 22, 0.4);
+  --glass-bg: rgba(42, 10, 18, 0.7);
+  --glass-border: rgba(237, 61, 102, 0.3);
+
+  --card: var(--bg-card);
+  --ring: var(--primary-brand);
+  --input: rgba(60, 15, 25, 0.8);
+  --muted: rgba(42, 10, 18, 0.8);
+  --accent: var(--accent-light);
+  --border: var(--border-subtle);
+  --popover: var(--bg-card);
+  --primary: var(--primary-brand);
+  --sidebar: rgba(15, 5, 8, 0.9);
+  --secondary: rgba(60, 15, 25, 0.6);
+  --background: var(--bg-app);
+  --foreground: var(--text-main);
+  --destructive: #ff6b6b;
+  --sidebar-ring: var(--primary-brand);
+  --sidebar-accent: var(--accent-light);
+  --sidebar-border: var(--border-subtle);
+  --card-foreground: var(--text-main);
+  --sidebar-primary: var(--primary-brand);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: #fbbf24;
+  --popover-foreground: var(--text-main);
+  --primary-foreground: #ffffff;
+  --sidebar-foreground: var(--text-main);
+  --secondary-foreground: rgba(255, 255, 255, 0.8);
+  --destructive-foreground: #ffffff;
+  --sidebar-accent-foreground: #fbbf24;
+  --sidebar-primary-foreground: #ffffff;
+}
+
+/* Eugenia theme special background */
+html[data-theme="eugenia"] body {
+  background: linear-gradient(to bottom right, #2a0a12, #0f0508);
+  background-attachment: fixed;
+}
+
+/* Eugenia theme gradient buttons */
+html[data-theme="eugenia"] [data-slot="button"][class*="bg-primary"] {
+  background: var(--gradient-brand);
+}
+
+html[data-theme="eugenia"] .story-ring {
+  background: var(--gradient-brand);
+}
+
+/* ===================================
+   TAILWIND THEME MAPPING
+   =================================== */
 @theme {
   --color-card: var(--card);
   --color-ring: var(--ring);
@@ -92,31 +199,18 @@
   --color-accent: var(--accent);
   --color-border: var(--border);
   --color-radius: var(--radius);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-popover: var(--popover);
   --color-primary: var(--primary);
   --color-sidebar: var(--sidebar);
-  --color-font-mono: var(--font-mono);
-  --color-font-sans: var(--font-sans);
+  --font-sans: var(--font-sans);
   --color-secondary: var(--secondary);
   --color-background: var(--background);
-  --color-font-serif: var(--font-serif);
   --color-foreground: var(--foreground);
   --color-destructive: var(--destructive);
-  --color-shadow-blur: var(--shadow-blur);
-  --color-shadow-color: var(--shadow-color);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-shadow-spread: var(--shadow-spread);
-  --color-shadow-opacity: var(--shadow-opacity);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-border: var(--sidebar-border);
   --color-card-foreground: var(--card-foreground);
-  --color-shadow-offset-x: var(--shadow-offset-x);
-  --color-shadow-offset-y: var(--shadow-offset-y);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent-foreground: var(--accent-foreground);
@@ -134,53 +228,354 @@
     @apply border-border;
   }
 
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
   }
 }
 
-/* Glassmorphism Styles */
-.glass-effect {
-  @apply bg-white/5 backdrop-blur-lg border-r border-white/10;
+/* ===================================
+   GLASSMORPHISM HEADER
+   =================================== */
+.glass-header {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-effect);
+  -webkit-backdrop-filter: var(--glass-effect);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-soft);
 }
 
-.content-card {
-  @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6 transition-all duration-300 hover:bg-white/10 hover:scale-[1.02];
+/* ===================================
+   HIGHLIGHTS RAIL - Story Section
+   =================================== */
+.highlights-rail {
+  position: relative;
 }
 
-.custom-table {
-  @apply w-full text-left border-collapse;
+/* Light mode - SOLID background */
+:root .highlights-rail,
+html[data-theme="light"] .highlights-rail {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
 }
 
-.custom-table th {
-  @apply p-4 text-gray-400 font-medium border-b border-white/10;
+/* Dark mode - SOLID background */
+html[data-theme="dark"] .highlights-rail,
+.dark .highlights-rail {
+  background: #1e293b;
+  border-color: #334155;
 }
 
-.custom-table td {
-  @apply p-4 text-gray-200 border-b border-white/5;
+/* Eugenia Brand mode - SOLID background */
+html[data-theme="eugenia"] .highlights-rail {
+  background: #2a0a12;
+  border-color: rgba(237, 61, 102, 0.2);
+  box-shadow: 
+    inset 0 1px 0 rgba(237, 61, 102, 0.1),
+    inset 0 -1px 0 rgba(237, 61, 102, 0.05);
 }
 
-.custom-table tr:last-child td {
-  @apply border-b-0;
+/* ===================================
+   PROFILE HIGHLIGHTS - Archive Stories
+   =================================== */
+.profile-highlights {
+  padding: 0;
 }
 
-.nav-link {
-  @apply flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 transition-all duration-200 hover:bg-white/5 hover:text-white;
+.profile-highlights button:focus {
+  outline: none;
 }
 
-.nav-link.active {
-  @apply bg-indigo-500/20 text-indigo-400 border border-indigo-500/30;
+.profile-highlights button:focus-visible {
+  outline: 2px solid var(--primary-brand);
+  outline-offset: 2px;
+  border-radius: 9999px;
 }
 
-.task-list-item {
-  @apply flex justify-between items-center p-3 rounded-lg hover:bg-white/5 transition-colors border-b border-white/5 last:border-0;
+/* ===================================
+   PROJECT CARDS - Portfolio Style
+   =================================== */
+.project-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
-/* Background Shapes */
-.shape-1 {
-  @apply absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/20 blur-[100px] pointer-events-none;
+.project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
 }
 
-.shape-2 {
-  @apply absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none;
+/* ===================================
+   STORY RING - Brand Gradient
+   =================================== */
+.story-ring {
+  background: linear-gradient(135deg, var(--primary-brand) 0%, #ff6b8a 50%, var(--primary-brand) 100%);
+  padding: 2px;
+  border-radius: 9999px;
+}
+
+.story-ring-unread {
+  animation: story-pulse 2s ease-in-out infinite;
+}
+
+@keyframes story-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(237, 61, 102, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(237, 61, 102, 0);
+  }
+}
+
+/* Multi-story stack effect */
+.story-stack-ring {
+  position: relative;
+}
+
+.story-stack-ring::before,
+.story-stack-ring::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  background: var(--gradient-brand);
+  opacity: 0.3;
+}
+
+.story-stack-ring::before {
+  transform: rotate(6deg);
+  opacity: 0.2;
+}
+
+.story-stack-ring::after {
+  transform: rotate(3deg);
+  opacity: 0.4;
+}
+
+/* Story viewer transitions */
+.story-viewer-content {
+  animation: story-fade-in 0.3s ease-out;
+}
+
+@keyframes story-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ===================================
+   BUTTONS - Modern Pills
+   =================================== */
+.btn-primary {
+  background: var(--primary-brand);
+  color: white;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(237, 61, 102, 0.3);
+}
+
+/* Gradient button for Eugenia mode */
+.btn-gradient {
+  background: var(--gradient-brand);
+  color: white;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-gradient:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(237, 61, 102, 0.4);
+}
+
+/* ===================================
+   THEME SWITCHER STYLES
+   =================================== */
+.theme-switcher {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Light mode - SOLID */
+:root .theme-switcher,
+html[data-theme="light"] .theme-switcher {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+/* Dark mode - SOLID */
+html[data-theme="dark"] .theme-switcher,
+.dark .theme-switcher {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+/* Eugenia mode - SOLID */
+html[data-theme="eugenia"] .theme-switcher {
+  background: #2a0a12;
+  border-color: rgba(237, 61, 102, 0.3);
+}
+
+.theme-switcher-dropdown {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3);
+}
+
+/* Light mode dropdown - SOLID */
+:root .theme-switcher-dropdown,
+html[data-theme="light"] .theme-switcher-dropdown {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+/* Dark mode dropdown - SOLID */
+html[data-theme="dark"] .theme-switcher-dropdown,
+.dark .theme-switcher-dropdown {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+/* Eugenia mode dropdown - SOLID */
+html[data-theme="eugenia"] .theme-switcher-dropdown {
+  background: #3a121b;
+  border-color: rgba(237, 61, 102, 0.3);
+}
+
+/* ===================================
+   LIKE HEART - Brand Color
+   =================================== */
+.heart-liked {
+  color: var(--primary-brand) !important;
+  fill: var(--primary-brand) !important;
+}
+
+/* ===================================
+   TAGS / BADGES
+   =================================== */
+.tag-badge {
+  background: var(--accent-light);
+  color: var(--primary-brand);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  font-weight: 500;
+}
+
+html[data-theme="eugenia"] .tag-badge {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fbbf24;
+}
+
+/* ===================================
+   SCROLLBAR - Subtle
+   =================================== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ===================================
+   ANIMATIONS
+   =================================== */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* Staggered animation for feed */
+.feed-item {
+  animation: fade-up 0.4s ease-out backwards;
+}
+
+.feed-item:nth-child(1) { animation-delay: 0ms; }
+.feed-item:nth-child(2) { animation-delay: 50ms; }
+.feed-item:nth-child(3) { animation-delay: 100ms; }
+.feed-item:nth-child(4) { animation-delay: 150ms; }
+.feed-item:nth-child(5) { animation-delay: 200ms; }
+
+/* ===================================
+   UTILITY CLASSES
+   =================================== */
+.text-gradient {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-gradient-brand {
+  background: var(--gradient-brand);
+}
+
+.border-gradient {
+  border-image: var(--gradient-brand) 1;
 }
