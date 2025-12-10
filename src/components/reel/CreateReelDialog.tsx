@@ -2,53 +2,52 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Loader2, Image as ImageIcon, Video } from 'lucide-react'
+import { Loader2, Video, X } from 'lucide-react'
 
-interface CreateStoryDialogProps {
+interface CreateReelDialogProps {
     isOpen: boolean
     onClose: () => void
     user: any
-    onStoryCreated: () => void
+    onReelCreated: () => void
 }
 
-export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: CreateStoryDialogProps) {
+export function CreateReelDialog({ isOpen, onClose, user, onReelCreated }: CreateReelDialogProps) {
     const [loading, setLoading] = useState(false)
-    const [mediaFile, setMediaFile] = useState<File | null>(null)
+    const [videoFile, setVideoFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null)
     const [title, setTitle] = useState('')
+    const [description, setDescription] = useState('')
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0]
             const isVideo = file.type.startsWith('video/')
-            const isImage = file.type.startsWith('image/')
             
-            if (!isVideo && !isImage) {
-                alert('Veuillez sélectionner une image ou une vidéo')
+            if (!isVideo) {
+                alert('Veuillez sélectionner une vidéo')
                 return
             }
             
-            setMediaFile(file)
-            setMediaType(isVideo ? 'video' : 'image')
+            setVideoFile(file)
             setPreviewUrl(URL.createObjectURL(file))
         }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!mediaFile || !user) return
+        if (!videoFile || !user) return
 
         setLoading(true)
         try {
-            const fileExt = mediaFile.name.split('.').pop()
-            const fileName = `${user.id}/story_${Date.now()}.${fileExt}`
+            const fileExt = videoFile.name.split('.').pop()
+            const fileName = `${user.id}/reel_${Date.now()}.${fileExt}`
 
-            // 1. Upload Media (Image or Video)
+            // 1. Upload Video
             const { error: uploadError } = await supabase.storage
                 .from('portfolio-media')
-                .upload(fileName, mediaFile)
+                .upload(fileName, videoFile)
 
             if (uploadError) throw uploadError
 
@@ -56,26 +55,27 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                 .from('portfolio-media')
                 .getPublicUrl(fileName)
 
-            // 2. Create Story Record
+            // 2. Create Reel Record in posts table with type 'reel'
             const { error: insertError } = await supabase
-                .from('stories')
+                .from('posts')
                 .insert({
                     user_id: user.id,
-                    image_url: publicUrl, // Keep for backward compatibility
-                    media_url: publicUrl, // New field for both images and videos
-                    media_type: mediaType, // 'image' or 'video'
-                    title: title || null,
+                    title: title.trim() || 'Untitled Reel',
+                    description: description.trim() || '',
+                    images: [publicUrl], // Store video URL in images array for compatibility
+                    video_url: publicUrl, // New field for video
+                    post_type: 'reel', // Distinguish from regular posts
+                    tags: [],
                     created_at: new Date().toISOString(),
-                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
                 })
 
             if (insertError) throw insertError
 
-            onStoryCreated()
+            onReelCreated()
             handleClose()
         } catch (error: any) {
-            console.error('Error creating story:', error)
-            alert(`Failed to create story: ${error.message}`)
+            console.error('Error creating reel:', error)
+            alert(`Failed to create reel: ${error.message || 'Unknown error'}`)
         } finally {
             setLoading(false)
         }
@@ -85,10 +85,10 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
         if (previewUrl) {
             URL.revokeObjectURL(previewUrl)
         }
-        setMediaFile(null)
+        setVideoFile(null)
         setPreviewUrl(null)
-        setMediaType(null)
         setTitle('')
+        setDescription('')
         onClose()
     }
 
@@ -96,9 +96,9 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
         <Dialog open={isOpen} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Add to Story</DialogTitle>
+                    <DialogTitle>Create Reel</DialogTitle>
                     <DialogDescription>
-                        Share a moment from your day. Stories disappear after 24 hours.
+                        Share a video reel with the community.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -106,16 +106,12 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                     <div className="flex flex-col items-center gap-4">
                         {previewUrl ? (
                             <div className="relative w-full max-w-[280px] mx-auto aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-lg">
-                                {mediaType === 'video' ? (
-                                    <video 
-                                        src={previewUrl} 
-                                        className="w-full h-full object-cover"
-                                        controls
-                                        muted
-                                    />
-                                ) : (
-                                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                                )}
+                                <video 
+                                    src={previewUrl} 
+                                    className="w-full h-full object-cover"
+                                    controls
+                                    muted
+                                />
                                 <Button
                                     type="button"
                                     variant="secondary"
@@ -125,35 +121,31 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                                         if (previewUrl) {
                                             URL.revokeObjectURL(previewUrl)
                                         }
-                                        setMediaFile(null)
+                                        setVideoFile(null)
                                         setPreviewUrl(null)
-                                        setMediaType(null)
                                     }}
                                 >
-                                    Change
+                                    <X className="w-4 h-4" />
                                 </Button>
                             </div>
                         ) : (
                             <div
                                 className="w-full max-w-[280px] mx-auto aspect-[9/16] border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => document.getElementById('story-media-upload')?.click()}
+                                onClick={() => document.getElementById('reel-video-upload')?.click()}
                             >
                                 <div className="flex flex-col items-center gap-2 p-4">
-                                    <div className="flex gap-3">
-                                        <ImageIcon className="w-10 h-10 text-muted-foreground" />
-                                        <Video className="w-10 h-10 text-muted-foreground" />
-                                    </div>
-                                    <span className="text-sm text-muted-foreground text-center">Click to upload photo or video</span>
+                                    <Video className="w-12 h-12 text-muted-foreground" />
+                                    <span className="text-sm text-muted-foreground text-center">Click to upload video</span>
                                 </div>
                             </div>
                         )}
 
                         <Input
                             type="file"
-                            accept="image/*,video/*"
+                            accept="video/*"
                             onChange={handleFileChange}
                             className="hidden"
-                            id="story-media-upload"
+                            id="reel-video-upload"
                         />
                     </div>
 
@@ -161,15 +153,24 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                         <Input
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Add a caption (optional)..."
+                            placeholder="Title (optional)..."
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Add a description (optional)..."
+                            rows={3}
                         />
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
-                        <Button type="submit" disabled={loading || !mediaFile}>
+                        <Button type="submit" disabled={loading || !videoFile}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Share Story
+                            Share Reel
                         </Button>
                     </div>
                 </form>
@@ -177,3 +178,4 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
         </Dialog>
     )
 }
+
