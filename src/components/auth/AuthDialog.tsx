@@ -24,8 +24,10 @@ interface AuthDialogProps {
 
 export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialogProps) {
     const [isLogin, setIsLogin] = useState(defaultTab === 'login')
+    const [isForgotPassword, setIsForgotPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
     // Form state
     const [email, setEmail] = useState('')
@@ -38,14 +40,26 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
         e.preventDefault()
         setLoading(true)
         setError(null)
+        setSuccessMessage(null)
 
         try {
-            if (isLogin) {
+            if (isForgotPassword) {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/reset-password`,
+                })
+                if (error) throw error
+                setSuccessMessage('Un email de réinitialisation a été envoyé à votre adresse email.')
+                // Close dialog after user has time to read the message
+                setTimeout(() => {
+                    onClose()
+                }, 2000)
+            } else if (isLogin) {
                 const { error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 })
                 if (error) throw error
+                onClose()
             } else {
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -60,8 +74,8 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                     },
                 })
                 if (error) throw error
+                onClose()
             }
-            onClose()
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -69,20 +83,43 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
         }
     }
 
+    const handleForgotPasswordClick = () => {
+        setIsForgotPassword(true)
+        setIsLogin(true)
+        setError(null)
+        setSuccessMessage(null)
+        setPassword('')
+    }
+
+    const handleBackToLogin = () => {
+        setIsForgotPassword(false)
+        setIsLogin(true)
+        setError(null)
+        setSuccessMessage(null)
+    }
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>{isLogin ? 'Welcome Back' : 'Create Account'}</DialogTitle>
+                    <DialogTitle>
+                        {isForgotPassword 
+                            ? 'Réinitialiser le mot de passe' 
+                            : isLogin 
+                            ? 'Welcome Back' 
+                            : 'Create Account'}
+                    </DialogTitle>
                     <DialogDescription>
-                        {isLogin
+                        {isForgotPassword
+                            ? 'Entrez votre adresse email pour recevoir un lien de réinitialisation'
+                            : isLogin
                             ? 'Enter your credentials to access your account'
                             : 'Join the community to share your projects'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                    {!isLogin && (
+                    {!isLogin && !isForgotPassword && (
                         <>
                             <div className="space-y-2">
                                 <Input
@@ -124,15 +161,17 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </div>
+                    {!isForgotPassword && (
+                        <div className="space-y-2">
+                            <Input
+                                type="password"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required={!isForgotPassword}
+                            />
+                        </div>
+                    )}
 
                     {error && (
                         <div className="text-sm text-red-500 bg-red-50 p-2 rounded">
@@ -140,22 +179,67 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         </div>
                     )}
 
+                    {successMessage && (
+                        <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                            {successMessage}
+                        </div>
+                    )}
+
                     <div className="flex flex-col gap-2 pt-2">
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isLogin ? 'Sign In' : 'Sign Up'}
+                            {isForgotPassword 
+                                ? 'Envoyer l\'email de réinitialisation' 
+                                : isLogin 
+                                ? 'Sign In' 
+                                : 'Sign Up'}
                         </Button>
 
-                        <div className="text-center text-sm text-muted-foreground mt-2">
-                            {isLogin ? "Don't have an account? " : "Already have an account? "}
-                            <button
-                                type="button"
-                                className="text-primary hover:underline font-medium"
-                                onClick={() => setIsLogin(!isLogin)}
-                            >
-                                {isLogin ? 'Sign Up' : 'Sign In'}
-                            </button>
-                        </div>
+                        {isForgotPassword ? (
+                            <div className="text-center text-sm text-muted-foreground mt-2">
+                                <button
+                                    type="button"
+                                    className="text-primary hover:underline font-medium"
+                                    onClick={handleBackToLogin}
+                                >
+                                    Retour à la connexion
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="text-center text-sm text-muted-foreground mt-2">
+                                {isLogin ? (
+                                    <>
+                                        Don't have an account?{' '}
+                                        <button
+                                            type="button"
+                                            className="text-primary hover:underline font-medium"
+                                            onClick={() => setIsLogin(!isLogin)}
+                                        >
+                                            Sign Up
+                                        </button>
+                                        <br />
+                                        <button
+                                            type="button"
+                                            className="text-primary hover:underline font-medium mt-1"
+                                            onClick={handleForgotPasswordClick}
+                                        >
+                                            Mot de passe oublié ?
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        Already have an account?{' '}
+                                        <button
+                                            type="button"
+                                            className="text-primary hover:underline font-medium"
+                                            onClick={() => setIsLogin(!isLogin)}
+                                        >
+                                            Sign In
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </form>
             </DialogContent>
