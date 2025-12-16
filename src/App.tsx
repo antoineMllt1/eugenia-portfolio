@@ -156,6 +156,9 @@ const StudentPortfolio: React.FC = () => {
   const [newMessageText, setNewMessageText] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const fetchingConversationsRef = useRef(false);
+  const fetchingInterlocutorRef = useRef<string | null>(null);
+  const conversationsRef = useRef(conversations);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<StudentProfile[]>([]);
@@ -497,6 +500,11 @@ const StudentPortfolio: React.FC = () => {
     }
   }, [viewingUserId, user]);
 
+  // Update conversations ref when conversations state changes
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
   // Fetch conversations when messages dialog opens
   useEffect(() => {
     if (isMessagesOpen && user) {
@@ -511,73 +519,84 @@ const StudentPortfolio: React.FC = () => {
       return;
     }
     
-    console.log('fetchInterlocutorInfo called for conversation:', conversationId);
+    // Prevent multiple simultaneous calls for the same conversation
+    if (fetchingInterlocutorRef.current === conversationId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('fetchInterlocutorInfo already in progress for conversation:', conversationId);
+      }
+      return;
+    }
+    
+    // Only log in development to reduce console noise
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('fetchInterlocutorInfo called for conversation:', conversationId);
+    }
+    
+    fetchingInterlocutorRef.current = conversationId;
     
     // First, try to get from conversations list (faster and more reliable)
-    const conv = conversations.find(c => c.id === conversationId);
+    // Use ref to avoid dependency on conversations array
+    const conv = conversationsRef.current.find(c => c.id === conversationId || c.conversation_id === conversationId);
     if (conv && conv.user && conv.user.id !== user.id) {
-      console.log('Using interlocutor from conversations list:', conv.user);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Using interlocutor from conversations list:', conv.user);
+      }
       setCurrentInterlocutor(conv.user);
+      fetchingInterlocutorRef.current = null;
+      // Don't fetch from DB if we already have it from the list (avoid unnecessary calls)
       return;
     }
     
     try {
-      // Get the other participant in this conversation
-      // First, get all participants for this conversation
-      const { data: allParticipants, error: allParticipantsError } = await supabase
-        .from('conversation_participants')
-        .select('user_id')
-        .eq('conversation_id', conversationId);
+      // Use RPC function to get the other participant (bypasses RLS)
+      const { data: otherUserId, error: rpcError } = await supabase.rpc('get_other_participant', {
+        conversation_id_param: conversationId,
+        current_user_id: user.id
+      });
       
-      if (allParticipantsError) {
-        console.error('Error fetching all participants:', allParticipantsError);
-        console.error('Error details:', JSON.stringify(allParticipantsError, null, 2));
-        return;
-      }
-      
-      console.log('All participants for conversation:', allParticipants);
-      
-      if (!allParticipants || allParticipants.length === 0) {
-        console.warn('No participants found for conversation:', conversationId);
-        return;
-      }
-      
-      // Find the other participant (not the current user)
-      const otherParticipant = allParticipants.find(p => p.user_id !== user.id);
-      
-      if (!otherParticipant || !otherParticipant.user_id) {
-        console.warn('No other participant found for conversation:', conversationId);
-        console.warn('Current user ID:', user.id);
-        console.warn('All participants:', allParticipants);
-        console.warn('This conversation may not have been created correctly with both participants.');
-        
-        // Try to get the interlocutor from the conversations list if available
-        const conv = conversations.find(c => c.id === conversationId);
+      if (rpcError) {
+        console.error('Error fetching other participant via RPC:', rpcError);
+        console.error('Error details:', JSON.stringify(rpcError, null, 2));
+        // Fallback: try to use conversation list data if available
         if (conv && conv.user && conv.user.id !== user.id) {
-          console.log('Using interlocutor from conversations list:', conv.user);
+          console.log('Using interlocutor from conversations list (RPC error):', conv.user);
+          setCurrentInterlocutor(conv.user);
+        }
+        return;
+      }
+      
+      if (!otherUserId) {
+        // Try to use conversation list data if available
+        if (conv && conv.user && conv.user.id !== user.id) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Using interlocutor from conversations list as fallback:', conv.user);
+          }
           setCurrentInterlocutor(conv.user);
           return;
         }
         
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Could not find interlocutor for conversation:', conversationId);
+        }
         return;
       }
-      
-      const participants = otherParticipant;
       
       // Fetch the profile of the other participant
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url, course')
-        .eq('id', participants.user_id)
+        .eq('id', otherUserId as string)
         .single();
       
       if (profileError) {
         console.error('Error fetching interlocutor profile:', profileError);
         console.error('Profile error details:', JSON.stringify(profileError, null, 2));
+        // Try to use conversation list data if available
+        if (conv && conv.user && conv.user.id !== user.id) {
+          setCurrentInterlocutor(conv.user);
+        }
         return;
       }
-      
-      console.log('Profile fetched:', profile);
       
       if (profile) {
         const interlocutorData = {
@@ -587,25 +606,60 @@ const StudentPortfolio: React.FC = () => {
           avatar_url: profile.avatar_url || '',
           course: profile.course,
         };
-        console.log('Setting currentInterlocutor:', interlocutorData);
-        setCurrentInterlocutor(interlocutorData);
+        // Only update if it's different to avoid unnecessary re-renders
+        if (!currentInterlocutor || currentInterlocutor.id !== interlocutorData.id) {
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('Setting currentInterlocutor:', interlocutorData);
+          }
+          setCurrentInterlocutor(interlocutorData);
+        } else if (process.env.NODE_ENV === 'development') {
+          console.debug('currentInterlocutor already set, skipping update');
+        }
       } else {
-        console.warn('No profile found for user_id:', participants.user_id);
+        console.warn('No profile found for user_id:', otherUserId);
+        // Try to use conversation list data if available
+        if (conv && conv.user && conv.user.id !== user.id) {
+          setCurrentInterlocutor(conv.user);
+        }
       }
     } catch (error) {
       console.error('Error in fetchInterlocutorInfo:', error);
+      // Try to use conversation list data if available
+      if (conv && conv.user && conv.user.id !== user.id) {
+        setCurrentInterlocutor(conv.user);
+      }
+    } finally {
+      fetchingInterlocutorRef.current = null;
     }
-  }, [user, conversations]);
+  }, [user]); // Removed conversations from dependencies to avoid unnecessary re-creations
 
-  // Fetch messages when a conversation is selected
+      // Fetch messages when a conversation is selected
   useEffect(() => {
     if (selectedConversation && user) {
-      console.log('Conversation selected:', selectedConversation);
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Conversation selected:', selectedConversation);
+      }
       setMessages([]); // Clear previous messages
-      setCurrentInterlocutor(null); // Clear previous interlocutor
       
-      // Fetch interlocutor info immediately
-      fetchInterlocutorInfo(selectedConversation);
+      // First, try to get interlocutor from conversations list (fastest)
+      // Use ref to get the latest conversations without causing re-renders
+      const conv = conversationsRef.current.find(c => c.id === selectedConversation || c.conversation_id === selectedConversation);
+      if (conv && conv.user && conv.user.id !== user.id) {
+        // Only update if it's different to avoid unnecessary re-renders
+        if (!currentInterlocutor || currentInterlocutor.id !== conv.user.id) {
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('Using interlocutor from conversations list:', conv.user);
+          }
+          setCurrentInterlocutor(conv.user);
+        }
+        // Don't call fetchInterlocutorInfo if we already have the interlocutor from the list
+      } else {
+        // Only clear and fetch if not found in list
+        if (currentInterlocutor) {
+          setCurrentInterlocutor(null); // Clear previous interlocutor only if we need to fetch
+        }
+        fetchInterlocutorInfo(selectedConversation);
+      }
       
       fetchMessages(selectedConversation);
       // Subscribe to new messages in real-time
@@ -630,8 +684,10 @@ const StudentPortfolio: React.FC = () => {
       };
     } else {
       setMessages([]); // Clear messages when no conversation is selected
+      setCurrentInterlocutor(null); // Clear interlocutor when no conversation is selected
     }
     // fetchMessages and fetchNewMessage are stable callbacks that only depend on user
+    // conversations and fetchInterlocutorInfo are stable or don't need to trigger re-runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation, user]);
 
@@ -653,139 +709,70 @@ const StudentPortfolio: React.FC = () => {
   const fetchConversations = async () => {
     if (!user) return;
     
+    // Prevent multiple simultaneous calls
+    if (fetchingConversationsRef.current) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('fetchConversations already in progress, skipping...');
+      }
+      return;
+    }
+    
+    fetchingConversationsRef.current = true;
     setLoadingConversations(true);
     try {
-      // Get all conversations where user is a participant
-      const { data: participantsData, error: participantsError } = await supabase
-        .from('conversation_participants')
-        .select(`
-          conversation_id,
-          conversations (
-            id,
-            updated_at
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // Use RPC function to get conversations (bypasses RLS)
+      const { data: conversationsData, error: rpcError } = await supabase.rpc('get_user_conversations', {
+        current_user_id: user.id
+      });
 
-      if (participantsError) throw participantsError;
+      if (rpcError) {
+        console.error('Error fetching conversations via RPC:', rpcError);
+        throw rpcError;
+      }
 
-      if (!participantsData || participantsData.length === 0) {
+      if (!conversationsData || conversationsData.length === 0) {
         setConversations([]);
+        conversationsRef.current = [];
         return;
       }
 
-      const conversationIds = participantsData.map(p => p.conversation_id);
+      // Format conversations from RPC result and remove duplicates
+      const seenConversationIds = new Set<string>();
+      const formattedConversations = conversationsData
+        .filter((conv: any) => {
+          // Filter out duplicates based on conversation_id
+          if (seenConversationIds.has(conv.conversation_id)) {
+            return false;
+          }
+          seenConversationIds.add(conv.conversation_id);
+          return true;
+        })
+        .map((conv: any) => {
+          const timestamp = conv.last_message_created_at 
+            ? formatMessageTime(new Date(conv.last_message_created_at))
+            : '';
 
-      // Get all participants for these conversations to find the other user
-      // Split into batches if too many conversations to avoid URL length limits
-      let allParticipants: any[] = [];
-      const batchSize = 50; // Process 50 conversations at a time
-      
-      for (let i = 0; i < conversationIds.length; i += batchSize) {
-        const batch = conversationIds.slice(i, i + batchSize);
-        // Use separate queries since foreign key names may not match
-        const { data: batchWithoutProfiles, error: batchWithoutProfilesError } = await supabase
-          .from('conversation_participants')
-          .select('conversation_id, user_id')
-          .in('conversation_id', batch)
-          .neq('user_id', user.id);
-        
-        if (batchWithoutProfilesError) {
-          console.error('Error fetching participants batch:', batchWithoutProfilesError);
-          throw batchWithoutProfilesError;
-        }
-        
-        // Fetch profiles separately
-        if (batchWithoutProfiles && batchWithoutProfiles.length > 0) {
-          const userIds = [...new Set(batchWithoutProfiles.map((p: any) => p.user_id))];
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url, course')
-            .in('id', userIds);
-          
-          allParticipants.push(...batchWithoutProfiles.map((p: any) => ({
-            ...p,
-            profiles: profilesData?.find((prof: any) => prof.id === p.user_id) || null
-          })));
-        }
-      }
-
-      // Get last message for each conversation (also batch if needed)
-      let lastMessagesData: any[] = [];
-      for (let i = 0; i < conversationIds.length; i += batchSize) {
-        const batch = conversationIds.slice(i, i + batchSize);
-        const { data: batchMessages, error: batchMessagesError } = await supabase
-          .from('messages')
-          .select('id, conversation_id, content, created_at')
-          .in('conversation_id', batch)
-          .order('created_at', { ascending: false });
-
-        if (batchMessagesError) {
-          console.error('Error fetching last messages batch:', batchMessagesError);
-        } else {
-          lastMessagesData.push(...(batchMessages || []));
-        }
-      }
-      
-      // Get only the most recent message per conversation
-      const lastMessagesByConversation = lastMessagesData.reduce((acc: any, msg: any) => {
-        if (!acc[msg.conversation_id] || new Date(msg.created_at) > new Date(acc[msg.conversation_id].created_at)) {
-          acc[msg.conversation_id] = msg;
-        }
-        return acc;
-      }, {});
-      
-      const lastMessagesArray = Object.values(lastMessagesByConversation);
-
-      // Build conversations list
-      const formattedConversations = participantsData.map(participant => {
-        const conversationId = participant.conversation_id;
-        const otherParticipant = allParticipants?.find(p => p.conversation_id === conversationId);
-        const lastMessage = lastMessagesArray?.find((m: any) => m.conversation_id === conversationId);
-
-        if (!otherParticipant) {
-          return null;
-        }
-
-        // Handle profiles as array or object
-        const profilesData = otherParticipant.profiles;
-        const profile = Array.isArray(profilesData) ? profilesData[0] : profilesData;
-        
-        if (!profile || !profile.id) {
-          return null;
-        }
-        const timestamp = lastMessage 
-          ? formatMessageTime(new Date(lastMessage.created_at))
-          : '';
-
-        return {
-          id: conversationId,
-          conversation_id: conversationId,
-          user: {
-            id: profile.id,
-            username: profile.username,
-            full_name: profile.full_name,
-            avatar_url: profile.avatar_url || '',
-            course: profile.course,
-          },
-          lastMessage: lastMessage?.content || 'Aucun message',
-          timestamp,
-        };
-      }).filter(Boolean) as Array<{
-        id: string;
-        conversation_id: string;
-        user: StudentProfile;
-        lastMessage: string;
-        timestamp: string;
-      }>;
+          return {
+            id: conv.conversation_id,
+            conversation_id: conv.conversation_id,
+            user: {
+              id: conv.other_user_id,
+              username: conv.other_username || 'username',
+              full_name: conv.other_full_name || 'Utilisateur',
+              avatar_url: conv.other_avatar_url || '',
+              course: conv.other_course || '',
+            },
+            lastMessage: conv.last_message_content || 'Aucun message',
+            timestamp,
+          };
+        });
 
       // Sort by updated_at (most recent first)
       formattedConversations.sort((a, b) => {
-        const aParticipant = participantsData.find(p => p.conversation_id === a.id);
-        const bParticipant = participantsData.find(p => p.conversation_id === b.id);
-        const aUpdated = (aParticipant?.conversations as any)?.updated_at;
-        const bUpdated = (bParticipant?.conversations as any)?.updated_at;
+        const aConv = conversationsData.find((c: any) => c.conversation_id === a.id);
+        const bConv = conversationsData.find((c: any) => c.conversation_id === b.id);
+        const aUpdated = aConv?.conversation_updated_at;
+        const bUpdated = bConv?.conversation_updated_at;
         
         // Handle null/undefined updated_at
         if (!aUpdated && !bUpdated) return 0;
@@ -796,11 +783,21 @@ const StudentPortfolio: React.FC = () => {
       });
 
       setConversations(formattedConversations);
-      console.log('Conversations chargées:', formattedConversations.length, formattedConversations);
+      conversationsRef.current = formattedConversations; // Update ref
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Conversations chargées:', formattedConversations.length);
+      }
     } catch (error: any) {
       console.error('Error fetching conversations:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      // Set empty array on error to prevent UI issues
+      setConversations([]);
+      conversationsRef.current = [];
+      // Show user-friendly error message
+      alert(`Erreur lors du chargement des conversations: ${error.message || 'Erreur inconnue'}`);
     } finally {
       setLoadingConversations(false);
+      fetchingConversationsRef.current = false;
     }
   };
 
@@ -1037,8 +1034,10 @@ const StudentPortfolio: React.FC = () => {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', selectedConversation);
 
-      // Refresh conversations to update last message
-      fetchConversations();
+      // Refresh conversations to update last message (only if messages dialog is open)
+      if (isMessagesOpen) {
+        fetchConversations();
+      }
     } catch (error: any) {
       console.error('Error sending message:', error);
       // Remove optimistic message on error
@@ -1054,49 +1053,26 @@ const StudentPortfolio: React.FC = () => {
     if (!user || !targetUserId || targetUserId === user.id) return;
 
     try {
-      // Check if conversation already exists
-      const { data: existingParticipants } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
+      // Check if conversation already exists using RPC function (more reliable)
+      const { data: existingConversationId, error: checkError } = await supabase
+        .rpc('check_existing_conversation', {
+          user1_id: user.id,
+          user2_id: targetUserId
+        });
 
-      if (existingParticipants) {
-        const conversationIds = existingParticipants.map(p => p.conversation_id);
-        const { data: existingConv, error: existingConvError } = await supabase
-          .from('conversation_participants')
-          .select('conversation_id')
-          .in('conversation_id', conversationIds)
-          .eq('user_id', targetUserId)
-          .maybeSingle(); // Use maybeSingle() instead of single() to handle zero rows gracefully
-
-        // Check if conversation exists (not an error, just no rows found)
-        if (existingConv && !existingConvError) {
-          // Fetch interlocutor info before setting selected conversation
-          const { data: targetProfile } = await supabase
-            .from('profiles')
-            .select('id, username, full_name, avatar_url, course')
-            .eq('id', targetUserId)
-            .single();
-          
-          if (targetProfile) {
-            setCurrentInterlocutor({
-              id: targetProfile.id,
-              username: targetProfile.username,
-              full_name: targetProfile.full_name,
-              avatar_url: targetProfile.avatar_url || '',
-              course: targetProfile.course,
-            });
-          }
-          
-          setSelectedConversation(existingConv.conversation_id);
-          setIsNewConversationOpen(false);
-          setNewConversationSearch(''); // Clear search
-          return;
+      if (checkError) {
+        console.error('Error checking for existing conversation:', checkError);
+        // Continue to create new conversation if check fails
+      } else if (existingConversationId) {
+        // Conversation already exists, use it
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Found existing conversation:', existingConversationId);
         }
-        // If error is PGRST116 (no rows found), that's expected - continue to create new conversation
-        if (existingConvError && existingConvError.code !== 'PGRST116') {
-          console.error('Error checking for existing conversation:', existingConvError);
-        }
+        setSelectedConversation(existingConversationId);
+        setIsNewConversationOpen(false);
+        setNewConversationSearch(''); // Clear search
+        // Don't fetch conversations here - it will be fetched when the dialog opens or when needed
+        return;
       }
 
       // Create new conversation using function (bypasses RLS issues)
@@ -1149,30 +1125,22 @@ const StudentPortfolio: React.FC = () => {
         
         console.log('Participants inserted:', insertedParticipants);
         
-        // Send email notification to the target user
-        await sendConversationNotification(targetUserId, user.id, newConversation.id);
+        // Don't set currentInterlocutor here - let the useEffect handle it when selectedConversation changes
+        // This prevents double-setting and ensures consistency
         
-        // Fetch interlocutor info immediately before setting selected conversation
-        const { data: targetProfile } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url, course')
-          .eq('id', targetUserId)
-          .single();
-        
-        if (targetProfile) {
-          setCurrentInterlocutor({
-            id: targetProfile.id,
-            username: targetProfile.username,
-            full_name: targetProfile.full_name,
-            avatar_url: targetProfile.avatar_url || '',
-            course: targetProfile.course,
-          });
-        }
+        // Send email notification to the target user (non-blocking)
+        // Suppress errors in production - notification is non-critical
+        sendConversationNotification(targetUserId, user.id, newConversation.id).catch(() => {
+          // Silently handle - notification errors are not critical
+        });
         
         setSelectedConversation(newConversation.id);
         setIsNewConversationOpen(false);
         setNewConversationSearch(''); // Clear search
-        fetchConversations();
+        // Refresh conversations list to include the new conversation
+        if (isMessagesOpen) {
+          fetchConversations();
+        }
         return;
       }
 
@@ -1181,76 +1149,49 @@ const StudentPortfolio: React.FC = () => {
         throw new Error('Failed to create conversation');
       }
 
-      // Verify that both participants were created
-      const { data: verifyParticipants, error: verifyError } = await supabase
-        .from('conversation_participants')
-        .select('user_id')
-        .eq('conversation_id', conversationId);
-      
-      console.log('Participants after function call:', verifyParticipants);
+      // Verify that both participants were created using RPC (bypasses RLS)
+      const { data: otherUserIdFromRPC, error: verifyError } = await supabase.rpc('get_other_participant', {
+        conversation_id_param: conversationId,
+        current_user_id: user.id
+      });
       
       if (verifyError) {
-        console.error('Error verifying participants:', verifyError);
-      } else if (!verifyParticipants || verifyParticipants.length < 2) {
-        console.warn('Function created conversation but participants are missing. Adding them manually...');
-        // Manually add participants if they're missing
-        const existingUserIds = verifyParticipants?.map(p => p.user_id) || [];
-        
-        // Only insert participants that don't already exist
-        const participantsToAdd = [];
-        if (!existingUserIds.includes(user.id)) {
-          participantsToAdd.push({ conversation_id: conversationId, user_id: user.id });
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error verifying other participant:', verifyError);
         }
-        if (!existingUserIds.includes(targetUserId)) {
-          participantsToAdd.push({ conversation_id: conversationId, user_id: targetUserId });
+      } else if (!otherUserIdFromRPC) {
+        // Silently add the other participant if missing (this is expected due to RLS)
+        const { error: addP2Error } = await supabase.rpc('add_conversation_participant', {
+          conversation_id_param: conversationId,
+          user_id_param: targetUserId
+        });
+        if (addP2Error && process.env.NODE_ENV === 'development') {
+          console.error('Error adding other participant via RPC:', addP2Error);
         }
         
-        if (participantsToAdd.length > 0) {
-          const { error: addParticipantsError } = await supabase
-            .from('conversation_participants')
-            .insert(participantsToAdd)
-            .select();
-          
-          if (addParticipantsError) {
-            console.error('Error manually adding participants:', addParticipantsError);
-            // If it's a 409 (conflict) or 23505 (unique violation), that's okay - participant already exists
-            if (addParticipantsError.code !== '23505' && addParticipantsError.code !== 'PGRST409') {
-              console.error('Unexpected error adding participants:', addParticipantsError);
-            } else {
-              console.log('Participant already exists (conflict), which is fine');
-            }
-          } else {
-            console.log('Successfully added missing participants');
-          }
-        } else {
-          console.log('All participants already exist, no need to add');
-        }
-      }
-
-      // Send email notification to the target user
-      await sendConversationNotification(targetUserId, user.id, conversationId);
-
-      // Fetch interlocutor info immediately before setting selected conversation
-      const { data: targetProfile } = await supabase
-        .from('profiles')
-        .select('id, username, full_name, avatar_url, course')
-        .eq('id', targetUserId)
-        .single();
-      
-      if (targetProfile) {
-        setCurrentInterlocutor({
-          id: targetProfile.id,
-          username: targetProfile.username,
-          full_name: targetProfile.full_name,
-          avatar_url: targetProfile.avatar_url || '',
-          course: targetProfile.course,
+        // Also ensure current user is a participant (should already be, but just in case)
+        await supabase.rpc('add_conversation_participant', {
+          conversation_id_param: conversationId,
+          user_id_param: user.id
         });
       }
+
+      // Don't set currentInterlocutor here - let the useEffect handle it when selectedConversation changes
+      // This prevents double-setting and ensures consistency
+
+      // Send email notification to the target user (non-blocking)
+      // Suppress errors in production - notification is non-critical
+      sendConversationNotification(targetUserId, user.id, conversationId).catch(() => {
+        // Silently handle - notification errors are not critical
+      });
 
       setSelectedConversation(conversationId);
       setIsNewConversationOpen(false);
       setNewConversationSearch(''); // Clear search
-      fetchConversations();
+      // Refresh conversations list to include the new conversation
+      if (isMessagesOpen) {
+        fetchConversations();
+      }
     } catch (error: any) {
       console.error('Error starting conversation:', error);
       alert(`Failed to start conversation: ${error.message || 'Unknown error'}`);
@@ -1277,13 +1218,15 @@ const StudentPortfolio: React.FC = () => {
         },
       });
 
-      if (error) {
-        console.error('Error sending notification email:', error);
-        // Don't throw - email failure shouldn't block conversation creation
+      // Silently handle notification errors - they're not critical for the conversation to work
+      if (error && process.env.NODE_ENV === 'development') {
+        console.debug('Notification email error (non-critical):', error);
       }
     } catch (error: any) {
-      console.error('Error in sendConversationNotification:', error);
-      // Don't throw - email failure shouldn't block conversation creation
+      // Silently handle notification errors - they're not critical for the conversation to work
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Notification email error (non-critical):', error);
+      }
     }
   };
 
@@ -2313,9 +2256,15 @@ const StudentPortfolio: React.FC = () => {
                       )
                       .map((conv) => (
                       <button
-                        key={conv.id}
+                        key={conv.conversation_id || conv.id}
                         onClick={() => {
-                          console.log('Conversation clicked:', conv.id, 'User:', conv.user);
+                          if (process.env.NODE_ENV === 'development') {
+                            console.debug('Conversation clicked:', conv.id, 'User:', conv.user);
+                          }
+                          // Set interlocutor immediately from the conversation
+                          if (conv.user && conv.user.id !== user?.id) {
+                            setCurrentInterlocutor(conv.user);
+                          }
                           setSelectedConversation(conv.id);
                           setNewMessageText('');
                         }}

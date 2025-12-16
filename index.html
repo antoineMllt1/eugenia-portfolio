@@ -46,14 +46,24 @@
         }
       }
       
-      // Apply theme colors to body and root immediately
+      // Apply theme colors to body immediately
       const colors = themeColors[currentTheme];
-      document.body.style.backgroundColor = colors.bg;
-      document.body.style.color = colors.text;
-      const root = document.getElementById('root');
-      if (root) {
-        root.style.backgroundColor = colors.bg;
-        root.style.color = colors.text;
+      if (document.body) {
+        document.body.style.backgroundColor = colors.bg;
+        document.body.style.color = colors.text;
+      }
+      // Apply to root after DOM is ready
+      const applyRootStyles = () => {
+        const root = document.getElementById('root');
+        if (root) {
+          root.style.backgroundColor = colors.bg;
+          root.style.color = colors.text;
+        }
+      };
+      // Try immediately, then on DOMContentLoaded
+      applyRootStyles();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyRootStyles);
       }
     })();
   </script>
