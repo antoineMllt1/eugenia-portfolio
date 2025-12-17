@@ -17,6 +17,8 @@ import { CreateReelDialog } from './components/reel/CreateReelDialog';
 import { MenuBar } from '@/components/ui/glow-menu';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { ScrollingLogo } from '@/components/ui/scrolling-logo';
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { Shield } from 'lucide-react';
 
 // Types
 interface StudentProfile {
@@ -28,6 +30,7 @@ interface StudentProfile {
   course?: string;
   github_url?: string;
   linkedin_url?: string;
+  role?: string;
 }
 
 interface ProjectPost {
@@ -127,7 +130,7 @@ const StudentPortfolio: React.FC = () => {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<PostOrReel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'reels' | 'create' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'reels' | 'create' | 'profile' | 'admin'>('home');
   const [homeFeedTab, setHomeFeedTab] = useState<'trending' | 'all'>('trending'); // Onglet actif dans Home
   const [showCreateChoice, setShowCreateChoice] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -184,7 +187,7 @@ const StudentPortfolio: React.FC = () => {
     created_at: string;
   }>>([]);
   const [loadingArchivedStories, setLoadingArchivedStories] = useState(false);
-  
+
   // Highlight Viewer State
   const [viewingHighlight, setViewingHighlight] = useState<Highlight | null>(null);
   const [highlightStoryIndex, setHighlightStoryIndex] = useState(0);
@@ -198,14 +201,14 @@ const StudentPortfolio: React.FC = () => {
     try {
       const selectedStoryObjects = userArchivedStories
         .filter(s => selectedArchivedStories.includes(s.id))
-        .map(s => ({ 
-          id: s.id, 
-          image: s.media_url || s.image, 
+        .map(s => ({
+          id: s.id,
+          image: s.media_url || s.image,
           media_url: s.media_url || s.image,
           media_type: s.media_type || 'image',
-          description: '' 
+          description: ''
         }));
-      
+
       const coverImage = selectedStoryObjects[0]?.image || null;
 
       // Insert into Supabase
@@ -223,12 +226,12 @@ const StudentPortfolio: React.FC = () => {
       if (error) {
         console.error('Error creating highlight:', error);
         let errorMessage = error.message;
-        
+
         // Provide helpful message if table doesn't exist
         if (error.message.includes('Could not find the table') || error.message.includes('relation') || error.code === '42P01') {
           errorMessage = `La table 'highlights' n'existe pas dans la base de données. Veuillez exécuter le fichier SQL de migration (supabase_migration_highlights.sql) dans votre éditeur SQL Supabase.`;
         }
-        
+
         alert(`Échec de la création du highlight: ${errorMessage}`);
         return;
       }
@@ -256,8 +259,8 @@ const StudentPortfolio: React.FC = () => {
 
   // Toggle archived story selection
   const toggleArchivedStorySelection = (storyId: string) => {
-    setSelectedArchivedStories(prev => 
-      prev.includes(storyId) 
+    setSelectedArchivedStories(prev =>
+      prev.includes(storyId)
         ? prev.filter(id => id !== storyId)
         : [...prev, storyId]
     );
@@ -290,7 +293,7 @@ const StudentPortfolio: React.FC = () => {
       // Update in Supabase
       const { error } = await supabase
         .from('highlights')
-        .update({ 
+        .update({
           stories: updatedStories,
           // Update cover_image if this is the first story
           cover_image: currentHighlight.cover_image || newStoryObj.image,
@@ -305,17 +308,17 @@ const StudentPortfolio: React.FC = () => {
       }
 
       // Update local state
-      setProfileHighlights(prev => prev.map(h => 
-        h.id === highlightId 
-          ? { 
-              ...h, 
-              stories: updatedStories,
-              cover_image: h.cover_image || newStoryObj.image,
-            }
+      setProfileHighlights(prev => prev.map(h =>
+        h.id === highlightId
+          ? {
+            ...h,
+            stories: updatedStories,
+            cover_image: h.cover_image || newStoryObj.image,
+          }
           : h
       ));
       setShowAddToHighlight(false);
-      
+
       // Show toast notification
       setAddedToHighlightToast(highlightTitle);
       setTimeout(() => setAddedToHighlightToast(null), 2000);
@@ -357,7 +360,7 @@ const StudentPortfolio: React.FC = () => {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
-  
+
   // Saved Posts State
   const [savedPosts, setSavedPosts] = useState<SavedPostItem[]>([]);
   const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
@@ -400,7 +403,7 @@ const StudentPortfolio: React.FC = () => {
     return grouped.map(group => ({
       ...group,
       hasMultiple: group.stories.length > 1,
-      stories: group.stories.sort((a, b) => 
+      stories: group.stories.sort((a, b) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       )
     }));
@@ -485,7 +488,7 @@ const StudentPortfolio: React.FC = () => {
   useEffect(() => {
     // Update ref to track current viewingUserId
     viewingUserIdRef.current = viewingUserId;
-    
+
     if (viewingUserId && user && viewingUserId !== user.id) {
       // Capture the userId at call time to prevent race conditions
       const currentUserId = viewingUserId;
@@ -518,7 +521,7 @@ const StudentPortfolio: React.FC = () => {
       console.warn('fetchInterlocutorInfo: No user');
       return;
     }
-    
+
     // Prevent multiple simultaneous calls for the same conversation
     if (fetchingInterlocutorRef.current === conversationId) {
       if (process.env.NODE_ENV === 'development') {
@@ -526,14 +529,14 @@ const StudentPortfolio: React.FC = () => {
       }
       return;
     }
-    
+
     // Only log in development to reduce console noise
     if (process.env.NODE_ENV === 'development') {
       console.debug('fetchInterlocutorInfo called for conversation:', conversationId);
     }
-    
+
     fetchingInterlocutorRef.current = conversationId;
-    
+
     // First, try to get from conversations list (faster and more reliable)
     // Use ref to avoid dependency on conversations array
     const conv = conversationsRef.current.find(c => c.id === conversationId || c.conversation_id === conversationId);
@@ -546,14 +549,14 @@ const StudentPortfolio: React.FC = () => {
       // Don't fetch from DB if we already have it from the list (avoid unnecessary calls)
       return;
     }
-    
+
     try {
       // Use RPC function to get the other participant (bypasses RLS)
       const { data: otherUserId, error: rpcError } = await supabase.rpc('get_other_participant', {
         conversation_id_param: conversationId,
         current_user_id: user.id
       });
-      
+
       if (rpcError) {
         console.error('Error fetching other participant via RPC:', rpcError);
         console.error('Error details:', JSON.stringify(rpcError, null, 2));
@@ -564,7 +567,7 @@ const StudentPortfolio: React.FC = () => {
         }
         return;
       }
-      
+
       if (!otherUserId) {
         // Try to use conversation list data if available
         if (conv && conv.user && conv.user.id !== user.id) {
@@ -574,20 +577,20 @@ const StudentPortfolio: React.FC = () => {
           setCurrentInterlocutor(conv.user);
           return;
         }
-        
+
         if (process.env.NODE_ENV === 'development') {
           console.warn('Could not find interlocutor for conversation:', conversationId);
         }
         return;
       }
-      
+
       // Fetch the profile of the other participant
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url, course')
         .eq('id', otherUserId as string)
         .single();
-      
+
       if (profileError) {
         console.error('Error fetching interlocutor profile:', profileError);
         console.error('Profile error details:', JSON.stringify(profileError, null, 2));
@@ -597,7 +600,7 @@ const StudentPortfolio: React.FC = () => {
         }
         return;
       }
-      
+
       if (profile) {
         const interlocutorData = {
           id: profile.id,
@@ -633,14 +636,14 @@ const StudentPortfolio: React.FC = () => {
     }
   }, [user]); // Removed conversations from dependencies to avoid unnecessary re-creations
 
-      // Fetch messages when a conversation is selected
+  // Fetch messages when a conversation is selected
   useEffect(() => {
     if (selectedConversation && user) {
       if (process.env.NODE_ENV === 'development') {
         console.debug('Conversation selected:', selectedConversation);
       }
       setMessages([]); // Clear previous messages
-      
+
       // First, try to get interlocutor from conversations list (fastest)
       // Use ref to get the latest conversations without causing re-renders
       const conv = conversationsRef.current.find(c => c.id === selectedConversation || c.conversation_id === selectedConversation);
@@ -660,7 +663,7 @@ const StudentPortfolio: React.FC = () => {
         }
         fetchInterlocutorInfo(selectedConversation);
       }
-      
+
       fetchMessages(selectedConversation);
       // Subscribe to new messages in real-time
       const channel = supabase
@@ -708,7 +711,7 @@ const StudentPortfolio: React.FC = () => {
 
   const fetchConversations = async () => {
     if (!user) return;
-    
+
     // Prevent multiple simultaneous calls
     if (fetchingConversationsRef.current) {
       if (process.env.NODE_ENV === 'development') {
@@ -716,7 +719,7 @@ const StudentPortfolio: React.FC = () => {
       }
       return;
     }
-    
+
     fetchingConversationsRef.current = true;
     setLoadingConversations(true);
     try {
@@ -748,7 +751,7 @@ const StudentPortfolio: React.FC = () => {
           return true;
         })
         .map((conv: any) => {
-          const timestamp = conv.last_message_created_at 
+          const timestamp = conv.last_message_created_at
             ? formatMessageTime(new Date(conv.last_message_created_at))
             : '';
 
@@ -773,12 +776,12 @@ const StudentPortfolio: React.FC = () => {
         const bConv = conversationsData.find((c: any) => c.conversation_id === b.id);
         const aUpdated = aConv?.conversation_updated_at;
         const bUpdated = bConv?.conversation_updated_at;
-        
+
         // Handle null/undefined updated_at
         if (!aUpdated && !bUpdated) return 0;
         if (!aUpdated) return 1; // a goes to bottom
         if (!bUpdated) return -1; // b goes to bottom
-        
+
         return new Date(bUpdated).getTime() - new Date(aUpdated).getTime();
       });
 
@@ -809,13 +812,13 @@ const StudentPortfolio: React.FC = () => {
       // Use separate queries since foreign key names may not match
       let data: any[] = [];
       let error: any = null;
-      
+
       const { data: messagesOnly, error: messagesOnlyError } = await supabase
         .from('messages')
         .select('id, content, sender_id, created_at')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
-      
+
       if (messagesOnlyError) {
         error = messagesOnlyError;
       } else if (messagesOnly && messagesOnly.length > 0) {
@@ -825,7 +828,7 @@ const StudentPortfolio: React.FC = () => {
           .from('profiles')
           .select('id, username, full_name, avatar_url, course')
           .in('id', senderIds);
-        
+
         // Merge profiles with messages
         data = messagesOnly.map((msg: any) => ({
           ...msg,
@@ -863,7 +866,7 @@ const StudentPortfolio: React.FC = () => {
 
   const fetchNewMessage = useCallback(async (messageId: string) => {
     if (!user) return;
-    
+
     try {
       // Use separate queries since foreign key names may not match
       const { data: messageData, error: messageError } = await supabase
@@ -896,15 +899,15 @@ const StudentPortfolio: React.FC = () => {
         if (prev.some(msg => msg.id === data.id)) {
           return prev;
         }
-        
+
         // If this is our own message, check if we have a temp message to replace
         if (data.sender_id === user.id) {
-          const tempMessageIndex = prev.findIndex(msg => 
-            msg.id.startsWith('temp-') && 
+          const tempMessageIndex = prev.findIndex(msg =>
+            msg.id.startsWith('temp-') &&
             msg.content === data.content &&
             msg.sender_id === user.id
           );
-          
+
           if (tempMessageIndex !== -1) {
             // Replace temp message with real one
             // Use profile data from the query response, or fallback to user data
@@ -921,7 +924,7 @@ const StudentPortfolio: React.FC = () => {
               avatar_url: '',
               course: '',
             };
-            
+
             const newMessages = [...prev];
             newMessages[tempMessageIndex] = {
               id: data.id,
@@ -932,7 +935,7 @@ const StudentPortfolio: React.FC = () => {
             };
             return newMessages;
           }
-          
+
           // If no temp message found, it means handleSendMessage already replaced it
           // Skip to avoid duplicate
           return prev;
@@ -964,7 +967,7 @@ const StudentPortfolio: React.FC = () => {
 
     const messageContent = newMessageText.trim();
     setSendingMessage(true);
-    
+
     // Optimistic update - add message immediately
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage = {
@@ -980,7 +983,7 @@ const StudentPortfolio: React.FC = () => {
         course: userProfile?.course || '',
       },
     };
-    
+
     setMessages(prev => [...prev, optimisticMessage]);
     setNewMessageText('');
 
@@ -1015,7 +1018,7 @@ const StudentPortfolio: React.FC = () => {
             avatar_url: '',
             course: '',
           };
-          
+
           const updatedMessages = [...filtered, {
             id: data.id,
             content: data.content,
@@ -1023,7 +1026,7 @@ const StudentPortfolio: React.FC = () => {
             created_at: data.created_at,
             sender: profile,
           }];
-          
+
           return updatedMessages;
         });
       }
@@ -1086,16 +1089,16 @@ const StudentPortfolio: React.FC = () => {
         // Log the error for debugging
         console.error('Function call error:', functionError);
         console.error('Error details:', JSON.stringify(functionError, null, 2));
-        
+
         // Fallback to direct insert if function doesn't exist
         console.warn('Function call failed, trying direct insert:', functionError);
-        
+
         // Debug: Check if user is authenticated
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
           throw new Error('User is not authenticated');
         }
-        
+
         const { data: newConversation, error: convError } = await supabase
           .from('conversations')
           .insert({})
@@ -1122,18 +1125,18 @@ const StudentPortfolio: React.FC = () => {
           console.error('Error inserting participants:', participantsError);
           throw participantsError;
         }
-        
+
         console.log('Participants inserted:', insertedParticipants);
-        
+
         // Don't set currentInterlocutor here - let the useEffect handle it when selectedConversation changes
         // This prevents double-setting and ensures consistency
-        
+
         // Send email notification to the target user (non-blocking)
         // Suppress errors in production - notification is non-critical
         sendConversationNotification(targetUserId, user.id, newConversation.id).catch(() => {
           // Silently handle - notification errors are not critical
         });
-        
+
         setSelectedConversation(newConversation.id);
         setIsNewConversationOpen(false);
         setNewConversationSearch(''); // Clear search
@@ -1154,7 +1157,7 @@ const StudentPortfolio: React.FC = () => {
         conversation_id_param: conversationId,
         current_user_id: user.id
       });
-      
+
       if (verifyError) {
         if (process.env.NODE_ENV === 'development') {
           console.error('Error verifying other participant:', verifyError);
@@ -1168,7 +1171,7 @@ const StudentPortfolio: React.FC = () => {
         if (addP2Error && process.env.NODE_ENV === 'development') {
           console.error('Error adding other participant via RPC:', addP2Error);
         }
-        
+
         // Also ensure current user is a participant (should already be, but just in case)
         await supabase.rpc('add_conversation_participant', {
           conversation_id_param: conversationId,
@@ -1355,7 +1358,7 @@ const StudentPortfolio: React.FC = () => {
 
   const fetchPostComments = async (postId: string, forceRefresh: boolean = false) => {
     if (postId in postComments && !forceRefresh) return; // Already fetched
-    
+
     setLoadingComments(prev => ({ ...prev, [postId]: true }));
     try {
       const { data, error } = await supabase
@@ -1403,7 +1406,7 @@ const StudentPortfolio: React.FC = () => {
     if (data) {
       setUserProfile(data);
     }
-    
+
     // Fetch followers and following counts
     await fetchFollowCounts(user.id);
   };
@@ -1431,7 +1434,7 @@ const StudentPortfolio: React.FC = () => {
 
   const checkIfFollowing = async (userId: string) => {
     if (!user || !userId || userId === user.id) return false;
-    
+
     try {
       const { data, error } = await supabase
         .from('follows')
@@ -1472,12 +1475,12 @@ const StudentPortfolio: React.FC = () => {
       if (error) throw error;
 
       setIsFollowing(prev => ({ ...prev, [userId]: true }));
-      
+
       // Update followers count for the followed user (only if viewing their profile)
       if (viewingUserId === userId) {
         setFollowersCount(prev => prev + 1);
       }
-      
+
       // Update following count for current user
       setFollowingCount(prev => prev + 1);
     } catch (error: any) {
@@ -1502,12 +1505,12 @@ const StudentPortfolio: React.FC = () => {
       if (error) throw error;
 
       setIsFollowing(prev => ({ ...prev, [userId]: false }));
-      
+
       // Update followers count for the unfollowed user (only if viewing their profile)
       if (viewingUserId === userId) {
         setFollowersCount(prev => Math.max(0, prev - 1));
       }
-      
+
       // Update following count for current user
       setFollowingCount(prev => Math.max(0, prev - 1));
     } catch (error: any) {
@@ -1521,7 +1524,7 @@ const StudentPortfolio: React.FC = () => {
   // Fetch highlights from Supabase
   const fetchHighlights = async () => {
     if (!user) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('highlights')
@@ -1554,7 +1557,7 @@ const StudentPortfolio: React.FC = () => {
   // Fetch user's archived stories (all stories, including expired ones, for highlight creation)
   const fetchUserArchivedStories = async () => {
     if (!user) return;
-    
+
     setLoadingArchivedStories(true);
     try {
       const { data, error } = await supabase
@@ -1593,7 +1596,7 @@ const StudentPortfolio: React.FC = () => {
 
   const fetchSavedPosts = async () => {
     if (!user) return;
-    
+
     setLoadingSavedPosts(true);
     try {
       // Fetch saved posts IDs
@@ -1705,39 +1708,39 @@ const StudentPortfolio: React.FC = () => {
         setReels([]);
       } else {
 
-      // Separate posts and reels
-      const allPosts = postsData || [];
+        // Separate posts and reels
+        const allPosts = postsData || [];
 
-      const formattedPosts = allPosts
-        .filter((post: any) => !post.post_type || post.post_type === 'post')
-        .map((post: any) => ({
-        ...post,
-          likes_count: post.likes?.length || 0,
-          comments_count: post.comments_count || 0,
-          saves_count: post.saved_posts?.length || 0,
-          liked_by_user: post.likes?.some((like: any) => like.user_id === user?.id) || false,
-          saved_by_user: post.saved_posts?.some((saved: any) => saved.user_id === user?.id) || false,
-        }));
-      
-      const formattedReels = allPosts
-        .filter((post: any) => post.post_type === 'reel' && post.video_url)
-        .map((post: any) => ({
-          id: post.id,
-          user_id: post.user_id,
-          profiles: post.profiles,
-          title: post.title,
-          description: post.description,
-          video_url: post.video_url,
-          post_type: 'reel' as const,
-          likes_count: post.likes?.length || 0,
-          comments_count: post.comments_count || 0,
-          saves_count: post.saved_posts?.length || 0,
-          created_at: post.created_at,
-          liked_by_user: post.likes?.some((like: any) => like.user_id === user?.id) || false,
-          saved_by_user: post.saved_posts?.some((saved: any) => saved.user_id === user?.id) || false,
-      }));
+        const formattedPosts = allPosts
+          .filter((post: any) => !post.post_type || post.post_type === 'post')
+          .map((post: any) => ({
+            ...post,
+            likes_count: post.likes?.length || 0,
+            comments_count: post.comments_count || 0,
+            saves_count: post.saved_posts?.length || 0,
+            liked_by_user: post.likes?.some((like: any) => like.user_id === user?.id) || false,
+            saved_by_user: post.saved_posts?.some((saved: any) => saved.user_id === user?.id) || false,
+          }));
 
-      setPosts(formattedPosts);
+        const formattedReels = allPosts
+          .filter((post: any) => post.post_type === 'reel' && post.video_url)
+          .map((post: any) => ({
+            id: post.id,
+            user_id: post.user_id,
+            profiles: post.profiles,
+            title: post.title,
+            description: post.description,
+            video_url: post.video_url,
+            post_type: 'reel' as const,
+            likes_count: post.likes?.length || 0,
+            comments_count: post.comments_count || 0,
+            saves_count: post.saved_posts?.length || 0,
+            created_at: post.created_at,
+            liked_by_user: post.likes?.some((like: any) => like.user_id === user?.id) || false,
+            saved_by_user: post.saved_posts?.some((saved: any) => saved.user_id === user?.id) || false,
+          }));
+
+        setPosts(formattedPosts);
         setReels(formattedReels);
       }
 
@@ -1745,7 +1748,7 @@ const StudentPortfolio: React.FC = () => {
       // Use separate queries since foreign key names may not match
       let storiesData: any[] = [];
       let storiesError: any = null;
-      
+
       const { data: storiesOnly, error: storiesOnlyError } = await supabase
         .from('stories')
         .select('*')
@@ -1760,7 +1763,7 @@ const StudentPortfolio: React.FC = () => {
           .from('profiles')
           .select('id, username, full_name, avatar_url')
           .in('id', userIds);
-        
+
         // Merge profiles with stories
         storiesData = storiesOnly.map((story: any) => ({
           ...story,
@@ -1780,7 +1783,7 @@ const StudentPortfolio: React.FC = () => {
           const expiresAt = new Date(story.expires_at);
           return expiresAt > now;
         });
-        
+
         // Map stories to include media_url and media_type for backward compatibility
         const formattedStories = validStories.map((story: any) => {
           const mediaUrl = story.media_url || story.image_url;
@@ -1792,9 +1795,9 @@ const StudentPortfolio: React.FC = () => {
             media_type: story.media_type || (isVideo ? 'video' : 'image')
           };
         });
-        
+
         setStories(formattedStories || []);
-        
+
         // Delete expired stories from database in background
         if (storiesData && storiesData.length > validStories.length) {
           const expiredStoryIds = (storiesData as any[])
@@ -1804,7 +1807,7 @@ const StudentPortfolio: React.FC = () => {
               return expiresAt <= now;
             })
             .map((story: any) => story.id);
-          
+
           if (expiredStoryIds.length > 0) {
             // Delete expired stories in background (don't wait for response)
             (async () => {
@@ -1816,7 +1819,7 @@ const StudentPortfolio: React.FC = () => {
                 if (error) {
                   console.error('Error deleting expired stories:', error);
                 }
-    } catch (error) {
+              } catch (error) {
                 console.error('Error deleting expired stories (promise rejection):', error);
               }
             })();
@@ -1840,18 +1843,18 @@ const StudentPortfolio: React.FC = () => {
       setAuthOpen(true);
       return;
     }
-    
+
     // Check if it's a reel
     const reel = reels.find(r => r.id === postId);
     const post = posts.find(p => p.id === postId);
     const targetItem = reel || post;
-    
+
     if (!targetItem) return;
-    
+
     const isCurrentlyLiked = targetItem.liked_by_user;
     const newLikedState = !isCurrentlyLiked;
     const newLikesCount = isCurrentlyLiked ? targetItem.likes_count - 1 : targetItem.likes_count + 1;
-    
+
     try {
       if (newLikedState) {
         // Add like
@@ -1861,7 +1864,7 @@ const StudentPortfolio: React.FC = () => {
             post_id: postId,
             user_id: user.id,
           });
-        
+
         if (error) throw error;
       } else {
         // Remove like
@@ -1870,10 +1873,10 @@ const StudentPortfolio: React.FC = () => {
           .delete()
           .eq('post_id', postId)
           .eq('user_id', user.id);
-        
+
         if (error) throw error;
       }
-      
+
       // Update local state
       if (reel) {
         setReels(reels.map(r =>
@@ -1888,7 +1891,7 @@ const StudentPortfolio: React.FC = () => {
             : p
         ));
       }
-      
+
       // Update selectedPost if it's the same item
       if (selectedPost && selectedPost.id === postId) {
         setSelectedPost({
@@ -1908,16 +1911,16 @@ const StudentPortfolio: React.FC = () => {
       setAuthOpen(true);
       return;
     }
-    
+
     // Check if it's a reel
     const reel = reels.find(r => r.id === postId);
     const post = posts.find(p => p.id === postId);
     const targetItem = reel || post;
-    
+
     if (!targetItem) return;
-    
+
     const isCurrentlySaved = targetItem.saved_by_user;
-    
+
     try {
       if (isCurrentlySaved) {
         // Remove from saved_posts
@@ -1926,7 +1929,7 @@ const StudentPortfolio: React.FC = () => {
           .delete()
           .eq('post_id', postId)
           .eq('user_id', user.id);
-        
+
         if (error) throw error;
       } else {
         // Add to saved_posts
@@ -1936,10 +1939,10 @@ const StudentPortfolio: React.FC = () => {
             post_id: postId,
             user_id: user.id,
           });
-        
+
         if (error) throw error;
       }
-      
+
       // Update local state
       if (reel) {
         setReels(reels.map(r =>
@@ -1954,7 +1957,7 @@ const StudentPortfolio: React.FC = () => {
             : p
         ));
       }
-      
+
       // Update selectedPost if it's the same item
       if (selectedPost && selectedPost.id === postId) {
         setSelectedPost({
@@ -1962,7 +1965,7 @@ const StudentPortfolio: React.FC = () => {
           saved_by_user: !isCurrentlySaved,
         });
       }
-      
+
       // Refresh saved posts if we're viewing the saved section
       if (savedPosts.length > 0) {
         fetchSavedPosts();
@@ -1979,10 +1982,10 @@ const StudentPortfolio: React.FC = () => {
       return;
     }
     if (!commentText.trim() || !selectedPost) return;
-    
+
     const commentTextValue = commentText.trim();
-      setCommentText('');
-    
+    setCommentText('');
+
     try {
       // Insert comment in database
       const { error } = await supabase.from('comments').insert({
@@ -1990,12 +1993,12 @@ const StudentPortfolio: React.FC = () => {
         user_id: user.id,
         text: commentTextValue
       });
-      
+
       if (error) throw error;
-      
+
       // Update local state
       const newCommentsCount = (selectedPost.comments_count || 0) + 1;
-      
+
       // Update in posts or reels
       const reel = reels.find(r => r.id === selectedPost.id);
       if (reel) {
@@ -2005,13 +2008,13 @@ const StudentPortfolio: React.FC = () => {
             : r
         ));
       } else {
-      setPosts(posts.map(post =>
-        post.id === selectedPost.id
+        setPosts(posts.map(post =>
+          post.id === selectedPost.id
             ? { ...post, comments_count: newCommentsCount }
-          : post
-      ));
+            : post
+        ));
       }
-      
+
       // Update selectedPost
       setSelectedPost({
         ...selectedPost,
@@ -2022,8 +2025,8 @@ const StudentPortfolio: React.FC = () => {
       if (user && userProfile) {
         const newComment: Comment = {
           id: `temp-${Date.now()}`,
-        post_id: selectedPost.id,
-        user_id: user.id,
+          post_id: selectedPost.id,
+          user_id: user.id,
           text: commentTextValue,
           created_at: new Date().toISOString(),
           profiles: {
@@ -2122,7 +2125,7 @@ const StudentPortfolio: React.FC = () => {
   ];
 
   // Sort by date for "all posts" section
-  const feedItemsAll = [...allFeedItems].sort((a, b) => 
+  const feedItemsAll = [...allFeedItems].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
@@ -2138,18 +2141,18 @@ const StudentPortfolio: React.FC = () => {
   // Early return with loading state if auth is still loading
   if (authLoading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: '#FAFAFA',
         fontFamily: 'sans-serif'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            width: '40px', 
-            height: '40px', 
+          <div style={{
+            width: '40px',
+            height: '40px',
             border: '4px solid #f3f3f3',
             borderTop: '4px solid #ed3d66',
             borderRadius: '50%',
@@ -2215,17 +2218,17 @@ const StudentPortfolio: React.FC = () => {
                   <p className="text-xs text-muted-foreground">Messages</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="rounded-full w-8 h-8"
                     onClick={() => setIsNewConversationOpen(true)}
                   >
                     <SquarePlus className="w-5 h-5" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="rounded-full w-8 h-8 hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => setIsMessagesOpen(false)}
                     title="Fermer les messages"
@@ -2234,7 +2237,7 @@ const StudentPortfolio: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              
+
               {/* Search Bar */}
               <div className="p-3 border-b border-border">
                 <Input
@@ -2244,7 +2247,7 @@ const StudentPortfolio: React.FC = () => {
                   className="h-9 bg-background/50 border-border rounded-lg"
                 />
               </div>
-              
+
               {/* Conversations List */}
               <ScrollArea className="flex-1">
                 {loadingConversations ? (
@@ -2264,41 +2267,40 @@ const StudentPortfolio: React.FC = () => {
                         c.user.full_name.toLowerCase().includes(messageSearch.toLowerCase())
                       )
                       .map((conv) => (
-                      <button
-                        key={conv.conversation_id || conv.id}
-                        onClick={() => {
-                          if (process.env.NODE_ENV === 'development') {
-                            console.debug('Conversation clicked:', conv.id, 'User:', conv.user);
-                          }
-                          // Set interlocutor immediately from the conversation
-                          if (conv.user && conv.user.id !== user?.id) {
-                            setCurrentInterlocutor(conv.user);
-                          }
-                          setSelectedConversation(conv.id);
-                          setNewMessageText('');
-                        }}
-                        className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/30 transition ${
-                          selectedConversation === conv.id ? 'bg-accent/50 border-l-2 border-primary' : ''
-                        }`}
-                      >
-                        <Avatar className="w-12 h-12 flex-shrink-0">
-                          <AvatarImage src={conv.user.avatar_url} />
-                          <AvatarFallback className="bg-primary/20 text-primary">{conv.user.full_name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="font-semibold text-sm truncate text-foreground">{conv.user?.full_name || 'Utilisateur'}</p>
-                            {conv.timestamp && (
-                              <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">{conv.timestamp}</span>
+                        <button
+                          key={conv.conversation_id || conv.id}
+                          onClick={() => {
+                            if (process.env.NODE_ENV === 'development') {
+                              console.debug('Conversation clicked:', conv.id, 'User:', conv.user);
+                            }
+                            // Set interlocutor immediately from the conversation
+                            if (conv.user && conv.user.id !== user?.id) {
+                              setCurrentInterlocutor(conv.user);
+                            }
+                            setSelectedConversation(conv.id);
+                            setNewMessageText('');
+                          }}
+                          className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/30 transition ${selectedConversation === conv.id ? 'bg-accent/50 border-l-2 border-primary' : ''
+                            }`}
+                        >
+                          <Avatar className="w-12 h-12 flex-shrink-0">
+                            <AvatarImage src={conv.user.avatar_url} />
+                            <AvatarFallback className="bg-primary/20 text-primary">{conv.user.full_name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="font-semibold text-sm truncate text-foreground">{conv.user?.full_name || 'Utilisateur'}</p>
+                              {conv.timestamp && (
+                                <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">{conv.timestamp}</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">@{conv.user?.username || 'username'}</p>
+                            {conv.lastMessage && (
+                              <p className="text-sm text-foreground/70 truncate mt-1">{conv.lastMessage}</p>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">@{conv.user?.username || 'username'}</p>
-                          {conv.lastMessage && (
-                            <p className="text-sm text-foreground/70 truncate mt-1">{conv.lastMessage}</p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))}
                   </div>
                 )}
               </ScrollArea>
@@ -2312,19 +2314,19 @@ const StudentPortfolio: React.FC = () => {
                   <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-background h-[60px]">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Bouton retour mobile uniquement */}
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full w-8 h-8 md:hidden flex-shrink-0"
                         onClick={() => setSelectedConversation(null)}
                       >
                         <ChevronLeft className="w-5 h-5" />
                       </Button>
-                      
+
                       {/* Avatar et nom de l'interlocuteur (pas l'utilisateur actuel) */}
                       {currentInterlocutor ? (
                         <>
-                          <Avatar 
+                          <Avatar
                             className="w-10 h-10 cursor-pointer flex-shrink-0"
                             onClick={() => {
                               setViewingUserId(currentInterlocutor.id);
@@ -2337,7 +2339,7 @@ const StudentPortfolio: React.FC = () => {
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p 
+                            <p
                               className="font-semibold text-base text-foreground cursor-pointer hover:opacity-70 truncate"
                               onClick={() => {
                                 setViewingUserId(currentInterlocutor.id);
@@ -2361,28 +2363,28 @@ const StudentPortfolio: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Boutons d'action Instagram (appel vidéo, appel, info) + Fermer */}
                     <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full w-9 h-9"
                         title="Appel vidéo"
                       >
                         <VideoCall className="w-5 h-5" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full w-9 h-9"
                         title="Appel"
                       >
                         <Phone className="w-5 h-5" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full w-9 h-9"
                         title="Informations"
                         onClick={() => {
@@ -2394,9 +2396,9 @@ const StudentPortfolio: React.FC = () => {
                       >
                         <Info className="w-5 h-5" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="rounded-full w-9 h-9 hover:bg-destructive/10 hover:text-destructive"
                         title="Fermer les messages"
                         onClick={() => setIsMessagesOpen(false)}
@@ -2405,7 +2407,7 @@ const StudentPortfolio: React.FC = () => {
                       </Button>
                     </div>
                   </div>
-                  
+
                   {/* Messages Area */}
                   <ScrollArea ref={messagesScrollRef} className="flex-1 p-4">
                     {loadingMessages ? (
@@ -2450,11 +2452,10 @@ const StudentPortfolio: React.FC = () => {
                               className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}
                             >
                               <div
-                                className={`px-4 py-2 rounded-2xl max-w-[65%] ${
-                                  isOwnMessage
-                                    ? 'bg-primary text-primary-foreground rounded-br-sm'
-                                    : 'bg-accent/50 text-foreground rounded-bl-sm'
-                                }`}
+                                className={`px-4 py-2 rounded-2xl max-w-[65%] ${isOwnMessage
+                                  ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                  : 'bg-accent/50 text-foreground rounded-bl-sm'
+                                  }`}
                               >
                                 <p className="text-sm leading-relaxed">{msg.content}</p>
                                 <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
@@ -2468,13 +2469,13 @@ const StudentPortfolio: React.FC = () => {
                       </div>
                     )}
                   </ScrollArea>
-                  
+
                   {/* Input Area - Style Instagram */}
                   <div className="p-4 border-t border-border bg-background">
                     <div className="flex items-center gap-2">
-                      <Input 
-                        placeholder="Écrire un message..." 
-                        className="flex-1 rounded-full bg-background/50 border-border h-10 px-4" 
+                      <Input
+                        placeholder="Écrire un message..."
+                        className="flex-1 rounded-full bg-background/50 border-border h-10 px-4"
                         value={newMessageText}
                         onChange={(e) => setNewMessageText(e.target.value)}
                         onKeyDown={(e) => {
@@ -2484,7 +2485,7 @@ const StudentPortfolio: React.FC = () => {
                           }
                         }}
                       />
-                      <Button 
+                      <Button
                         onClick={handleSendMessage}
                         disabled={!newMessageText.trim() || sendingMessage}
                         size="icon"
@@ -2571,10 +2572,10 @@ const StudentPortfolio: React.FC = () => {
                   u.username.toLowerCase().includes(newConversationSearch.toLowerCase()) ||
                   u.full_name.toLowerCase().includes(newConversationSearch.toLowerCase())
                 ).length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p className="text-sm">Aucun utilisateur trouvé</p>
-                  </div>
-                )}
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">Aucun utilisateur trouvé</p>
+                    </div>
+                  )}
               </div>
             </ScrollArea>
           </div>
@@ -2622,14 +2623,14 @@ const StudentPortfolio: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-4">
             {/* Theme Switcher */}
             <div className="relative z-50">
-            <ThemeSwitcher />
+              <ThemeSwitcher />
             </div>
-            
+
             {/* Logo */}
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold text-foreground tracking-tight">Eugeniagram</h1>
@@ -2673,123 +2674,123 @@ const StudentPortfolio: React.FC = () => {
               <span className="text-xs text-muted-foreground">• Student Stories</span>
             </div>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {/* 1. ADD STORY BUTTON - Always First (Static) */}
-            {user && (() => {
-              const currentUserStories = groupedStories.find(g => g.user_id === user.id);
-              const hasOwnStories = !!currentUserStories;
-              
-              return (
-                <div className="flex flex-col items-center gap-2 flex-shrink-0">
-                  <div className="relative">
-                    {/* Main Avatar Button */}
-                    <button
-                      onClick={() => {
-                        if (hasOwnStories && currentUserStories) {
-                          handleOpenUserStories(currentUserStories);
-                        } else {
-                          setIsCreateStoryOpen(true);
-                        }
-                      }}
-                      className="group"
-                    >
-                      {hasOwnStories ? (
-                        // User HAS stories - Show avatar with gradient ring
-                        <>
-                          {currentUserStories && currentUserStories.hasMultiple && (
-                            <>
-                              <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/40 to-[#f97316]/40 transform rotate-6" />
-                              <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/60 to-[#f97316]/60 transform rotate-3" />
-                            </>
-                          )}
-                          <div className="story-ring story-ring-unread relative">
-                            <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
-                              <Avatar className="w-full h-full">
-                                <AvatarImage 
-                                  src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
-                                  className="object-cover" 
-                                />
-                                <AvatarFallback className="bg-accent text-primary font-medium">
-                                  {userProfile?.username?.[0] || user.email?.[0]?.toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
+              {/* 1. ADD STORY BUTTON - Always First (Static) */}
+              {user && (() => {
+                const currentUserStories = groupedStories.find(g => g.user_id === user.id);
+                const hasOwnStories = !!currentUserStories;
+
+                return (
+                  <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                    <div className="relative">
+                      {/* Main Avatar Button */}
+                      <button
+                        onClick={() => {
+                          if (hasOwnStories && currentUserStories) {
+                            handleOpenUserStories(currentUserStories);
+                          } else {
+                            setIsCreateStoryOpen(true);
+                          }
+                        }}
+                        className="group"
+                      >
+                        {hasOwnStories ? (
+                          // User HAS stories - Show avatar with gradient ring
+                          <>
+                            {currentUserStories && currentUserStories.hasMultiple && (
+                              <>
+                                <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/40 to-[#f97316]/40 transform rotate-6" />
+                                <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/60 to-[#f97316]/60 transform rotate-3" />
+                              </>
+                            )}
+                            <div className="story-ring story-ring-unread relative">
+                              <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
+                                <Avatar className="w-full h-full">
+                                  <AvatarImage
+                                    src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
+                                    className="object-cover"
+                                  />
+                                  <AvatarFallback className="bg-accent text-primary font-medium">
+                                    {userProfile?.username?.[0] || user.email?.[0]?.toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </div>
                             </div>
+                          </>
+                        ) : (
+                          // User has NO stories - Show dashed border style
+                          <div className="w-[72px] h-[72px] rounded-full bg-accent border-2 border-dashed border-primary/30 flex items-center justify-center group-hover:border-primary group-hover:bg-accent/80 transition-all duration-300 overflow-hidden">
+                            <Avatar className="w-full h-full">
+                              <AvatarImage
+                                src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`}
+                                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity"
+                              />
+                              <AvatarFallback className="bg-accent text-primary/60 font-medium">
+                                {userProfile?.username?.[0] || user.email?.[0]?.toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                           </div>
-                        </>
-                      ) : (
-                        // User has NO stories - Show dashed border style
-                        <div className="w-[72px] h-[72px] rounded-full bg-accent border-2 border-dashed border-primary/30 flex items-center justify-center group-hover:border-primary group-hover:bg-accent/80 transition-all duration-300 overflow-hidden">
-                          <Avatar className="w-full h-full">
-                            <AvatarImage 
-                              src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} 
-                              className="object-cover opacity-60 group-hover:opacity-80 transition-opacity" 
-                            />
-                            <AvatarFallback className="bg-accent text-primary/60 font-medium">
-                              {userProfile?.username?.[0] || user.email?.[0]?.toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                        )}
+                      </button>
+
+                      {/* Plus Badge - Always visible, opens create dialog */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCreateStoryOpen(true);
+                        }}
+                        className="absolute bottom-0 right-0 w-6 h-6 bg-gradient-to-br from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg hover:scale-110 active:scale-95 transition-transform z-10"
+                      >
+                        <Plus className="w-3 h-3 text-white" />
+                      </button>
+
+                      {/* Story count badge for own stories */}
+                      {hasOwnStories && currentUserStories && currentUserStories.stories.length > 1 && (
+                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 bg-card rounded-full flex items-center justify-center border border-border shadow-sm">
+                          <span className="text-[10px] font-bold text-primary">{currentUserStories.stories.length}</span>
                         </div>
                       )}
-                    </button>
-                    
-                    {/* Plus Badge - Always visible, opens create dialog */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsCreateStoryOpen(true);
-                      }}
-                      className="absolute bottom-0 right-0 w-6 h-6 bg-gradient-to-br from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg hover:scale-110 active:scale-95 transition-transform z-10"
-                    >
-                      <Plus className="w-3 h-3 text-white" />
-                    </button>
-                    
-                    {/* Story count badge for own stories */}
-                    {hasOwnStories && currentUserStories && currentUserStories.stories.length > 1 && (
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 bg-card rounded-full flex items-center justify-center border border-border shadow-sm">
-                        <span className="text-[10px] font-bold text-primary">{currentUserStories.stories.length}</span>
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">Your Story</span>
+                  </div>
+                );
+              })()}
+
+              {/* 2. OTHER USERS' STORIES - Dynamic Loop (excludes current user) */}
+              {groupedStories.filter(g => g.user_id !== user?.id).map((group, index) => (
+                <button
+                  key={group.user_id}
+                  onClick={() => handleOpenUserStories(group)}
+                  className="flex flex-col items-center gap-2 flex-shrink-0 group"
+                >
+                  <div className="relative">
+                    {/* Multi-story stack indicator */}
+                    {group.hasMultiple && (
+                      <>
+                        <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/40 to-[#f97316]/40 transform rotate-6" />
+                        <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/60 to-[#f97316]/60 transform rotate-3" />
+                      </>
+                    )}
+                    <div className={`story-ring ${index < 3 ? 'story-ring-unread' : ''} relative`}>
+                      <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
+                        <Avatar className="w-full h-full">
+                          <AvatarImage src={group.profile.avatar_url} className="object-cover" />
+                          <AvatarFallback className="bg-accent text-primary font-medium">{group.profile.username[0]}</AvatarFallback>
+                        </Avatar>
+                      </div>
+                    </div>
+                    {/* Story count badge */}
+                    {group.hasMultiple && (
+                      <div className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1.5 bg-gradient-to-r from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg">
+                        <span className="text-[10px] font-bold text-white">{group.stories.length}</span>
                       </div>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-muted-foreground">Your Story</span>
-                </div>
-              );
-            })()}
-
-            {/* 2. OTHER USERS' STORIES - Dynamic Loop (excludes current user) */}
-            {groupedStories.filter(g => g.user_id !== user?.id).map((group, index) => (
-              <button
-                key={group.user_id}
-                onClick={() => handleOpenUserStories(group)}
-                className="flex flex-col items-center gap-2 flex-shrink-0 group"
-              >
-                <div className="relative">
-                  {/* Multi-story stack indicator */}
-                  {group.hasMultiple && (
-                    <>
-                      <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/40 to-[#f97316]/40 transform rotate-6" />
-                      <div className="absolute -right-0.5 -top-0.5 w-[72px] h-[72px] rounded-full bg-gradient-to-br from-[#ed3d66]/60 to-[#f97316]/60 transform rotate-3" />
-                    </>
-                  )}
-                  <div className={`story-ring ${index < 3 ? 'story-ring-unread' : ''} relative`}>
-                    <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
-                      <Avatar className="w-full h-full">
-                        <AvatarImage src={group.profile.avatar_url} className="object-cover" />
-                        <AvatarFallback className="bg-accent text-primary font-medium">{group.profile.username[0]}</AvatarFallback>
-                      </Avatar>
-                    </div>
-                  </div>
-                  {/* Story count badge */}
-                  {group.hasMultiple && (
-                    <div className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1.5 bg-gradient-to-r from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg">
-                      <span className="text-[10px] font-bold text-white">{group.stories.length}</span>
-                    </div>
-                  )}
-                </div>
-                <span className="text-xs max-w-[72px] truncate text-muted-foreground group-hover:text-foreground transition-colors font-medium">{group.profile.username}</span>
-              </button>
-            ))}
+                  <span className="text-xs max-w-[72px] truncate text-muted-foreground group-hover:text-foreground transition-colors font-medium">{group.profile.username}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Main Content */}
@@ -2824,24 +2825,22 @@ const StudentPortfolio: React.FC = () => {
                       onClick={() => setHomeFeedTab('trending')}
                       className="relative py-3 px-1 transition-colors"
                     >
-                      <span className={`text-base font-semibold transition-colors ${
-                        homeFeedTab === 'trending' ? 'text-foreground' : 'text-muted-foreground'
-                      }`}>
+                      <span className={`text-base font-semibold transition-colors ${homeFeedTab === 'trending' ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
                         Tendances
                       </span>
                       {homeFeedTab === 'trending' && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#ed3d66] to-[#f97316] rounded-full" />
                       )}
                     </button>
-                    
+
                     {/* Onglet Tous les posts */}
                     <button
                       onClick={() => setHomeFeedTab('all')}
                       className="relative py-3 px-1 transition-colors"
                     >
-                      <span className={`text-base font-semibold transition-colors ${
-                        homeFeedTab === 'all' ? 'text-foreground' : 'text-muted-foreground'
-                      }`}>
+                      <span className={`text-base font-semibold transition-colors ${homeFeedTab === 'all' ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>
                         Tous les posts
                       </span>
                       {homeFeedTab === 'all' && (
@@ -2857,19 +2856,231 @@ const StudentPortfolio: React.FC = () => {
                   feedItemsTop.length > 0 ? (
                     <div className="space-y-4">
                       {feedItemsTop.map((item, index) => {
+                        const isReel = item.type === 'reel';
+                        const itemId = item.id;
+                        const itemPostOrReel: PostOrReel = isReel
+                          ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const }
+                          : item as ProjectPost;
+
+                        return (
+                          <Card key={`top-${itemId}`} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
+                            {/* Post/Reel Header */}
+                            <div className="p-4 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Avatar
+                                  className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
+                                  onClick={() => setViewingUserId(item.user_id)}
+                                >
+                                  <AvatarImage src={item.profiles.avatar_url} />
+                                  <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p
+                                    className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
+                                    onClick={() => setViewingUserId(item.user_id)}
+                                  >
+                                    {item.profiles.full_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="icon" className="rounded-full">
+                                <MoreHorizontal className="h-5 w-5" />
+                              </Button>
+                            </div>
+
+                            {/* Post/Reel Media */}
+                            <div className="relative bg-muted">
+                              {isReel && item.video_url ? (
+                                <video
+                                  src={item.video_url}
+                                  className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                  onClick={() => setSelectedPost(itemPostOrReel)}
+                                  muted
+                                  playsInline
+                                />
+                              ) : (
+                                <>
+                                  {item.images.length > 1 && (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
+                                        onClick={() =>
+                                          setCurrentImageIndex(prev => ({
+                                            ...prev,
+                                            [itemId]: Math.max(0, (prev[itemId] ?? 0) - 1)
+                                          }))
+                                        }
+                                      >
+                                        <ChevronLeft className="h-5 w-5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
+                                        onClick={() =>
+                                          setCurrentImageIndex(prev => ({
+                                            ...prev,
+                                            [itemId]: Math.min(item.images.length - 1, (prev[itemId] ?? 0) + 1)
+                                          }))
+                                        }
+                                      >
+                                        <ChevronRight className="h-5 w-5" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  <img
+                                    src={item.images[(currentImageIndex[itemId] ?? 0) % item.images.length]}
+                                    alt={item.title}
+                                    className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                    onClick={() => setSelectedPost(itemPostOrReel)}
+                                  />
+                                  {item.images.length > 1 && (
+                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                      {item.images.map((_, idx) => (
+                                        <div
+                                          key={idx}
+                                          className={`w-1.5 h-1.5 rounded-full transition-all ${idx === (currentImageIndex[itemId] ?? 0) ? 'bg-primary scale-125' : 'bg-white/60'
+                                            }`}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {isReel && (
+                                <div className="absolute top-2 right-2 z-10">
+                                  <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                                    <Video className="w-4 h-4 text-white" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Post/Reel Actions & Content */}
+                            <CardContent className="p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleLike(itemId)}
+                                    className={`rounded-full ${item.liked_by_user ? 'text-primary' : ''}`}
+                                  >
+                                    <Heart className={`h-6 w-6 transition-all ${item.liked_by_user ? 'fill-primary text-primary scale-110' : ''}`} />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => setSelectedPost(itemPostOrReel)} className="rounded-full">
+                                    <MessageCircle className="h-6 w-6" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="rounded-full">
+                                    <Share2 className="h-6 w-6" />
+                                  </Button>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleSave(itemId)}
+                                  className={`rounded-full ${item.saved_by_user ? 'text-primary' : ''}`}
+                                >
+                                  <Bookmark className={`h-6 w-6 ${item.saved_by_user ? 'fill-primary' : ''}`} />
+                                </Button>
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="font-semibold text-sm">{item.likes_count} likes</p>
+                                <p className="text-sm">
+                                  <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username}</span>{' '}
+                                  <span className="font-bold text-foreground">{item.title}</span>
+                                </p>
+                                <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                                {!isReel && item.tags && item.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {item.tags.map((tag) => (
+                                      <span key={tag} className="tag-badge">
+                                        #{tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {/* Comments Section */}
+                                {item.comments_count > 0 && (
+                                  <>
+                                    {!expandedComments[itemId] && postComments[itemId] && postComments[itemId].length > 0 && (
+                                      <div className="space-y-2 mt-2">
+                                        {postComments[itemId].slice(-2).map((comment) => (
+                                          <div key={comment.id} className="flex gap-2">
+                                            <p className="text-sm">
+                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                              <span className="text-foreground">{comment.text}</span>
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {expandedComments[itemId] && postComments[itemId] && (
+                                      <div className="space-y-2 mt-2">
+                                        {postComments[itemId].map((comment) => (
+                                          <div key={comment.id} className="flex gap-2">
+                                            <p className="text-sm">
+                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                              <span className="text-foreground">{comment.text}</span>
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {!expandedComments[itemId] && item.comments_count > 2 && (
+                                      <button
+                                        onClick={async () => {
+                                          if (!expandedComments[itemId]) {
+                                            await fetchPostComments(itemId);
+                                            setExpandedComments(prev => ({ ...prev, [itemId]: true }));
+                                          } else {
+                                            setExpandedComments(prev => ({ ...prev, [itemId]: false }));
+                                          }
+                                        }}
+                                        className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+                                      >
+                                        Voir tous les commentaires ({item.comments_count})
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                                <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent flex items-center justify-center">
+                        <GraduationCap className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Aucun post tendance</h3>
+                      <p className="text-muted-foreground text-sm">Les posts les plus interactifs apparaîtront ici</p>
+                    </div>
+                  )
+                ) : (
+                  /* Section Tous les posts */
+                  <div className="space-y-4">
+                    {feedItemsAll.map((item, index) => {
                       const isReel = item.type === 'reel';
                       const itemId = item.id;
-                      const itemPostOrReel: PostOrReel = isReel 
+                      const itemPostOrReel: PostOrReel = isReel
                         ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const }
                         : item as ProjectPost;
-                      
+
                       return (
-                        <Card key={`top-${itemId}`} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
+                        <Card key={itemId} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
                           {/* Post/Reel Header */}
                           <div className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <Avatar 
-                                className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all" 
+                              <Avatar
+                                className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
                                 onClick={() => setViewingUserId(item.user_id)}
                               >
                                 <AvatarImage src={item.profiles.avatar_url} />
@@ -2902,55 +3113,55 @@ const StudentPortfolio: React.FC = () => {
                               />
                             ) : (
                               <>
-                            {item.images.length > 1 && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
-                                    onClick={() =>
-                                      setCurrentImageIndex(prev => ({
-                                        ...prev,
-                                        [itemId]: Math.max(0, (prev[itemId] ?? 0) - 1)
-                                      }))
-                                    }
-                                >
-                                  <ChevronLeft className="h-5 w-5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
-                                    onClick={() =>
-                                      setCurrentImageIndex(prev => ({
-                                        ...prev,
-                                        [itemId]: Math.min(item.images.length - 1, (prev[itemId] ?? 0) + 1)
-                                      }))
-                                    }
-                                >
-                                  <ChevronRight className="h-5 w-5" />
-                                </Button>
-                              </>
-                            )}
-                            <img
+                                {item.images.length > 1 && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
+                                      onClick={() =>
+                                        setCurrentImageIndex(prev => ({
+                                          ...prev,
+                                          [itemId]: Math.max(0, (prev[itemId] ?? 0) - 1)
+                                        }))
+                                      }
+                                    >
+                                      <ChevronLeft className="h-5 w-5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
+                                      onClick={() =>
+                                        setCurrentImageIndex(prev => ({
+                                          ...prev,
+                                          [itemId]: Math.min(item.images.length - 1, (prev[itemId] ?? 0) + 1)
+                                        }))
+                                      }
+                                    >
+                                      <ChevronRight className="h-5 w-5" />
+                                    </Button>
+                                  </>
+                                )}
+                                <img
                                   src={item.images[(currentImageIndex[itemId] ?? 0) % item.images.length]}
                                   alt={item.title}
-                              className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                  className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
                                   onClick={() => setSelectedPost(itemPostOrReel)}
-                            />
-                              {item.images.length > 1 && (
-                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                                  {item.images.map((_, idx) => (
-                            <div
-                              key={idx}
-                                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === (currentImageIndex[itemId] ?? 0) ? 'bg-primary scale-125' : 'bg-white/60'
-                                }`}
-                            />
-                              ))}
-                                </div>
-                              )}
-                            </>
-                          )}
+                                />
+                                {item.images.length > 1 && (
+                                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                    {item.images.map((_, idx) => (
+                                      <div
+                                        key={idx}
+                                        className={`w-1.5 h-1.5 rounded-full transition-all ${idx === (currentImageIndex[itemId] ?? 0) ? 'bg-primary scale-125' : 'bg-white/60'
+                                          }`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            )}
                             {isReel && (
                               <div className="absolute top-2 right-2 z-10">
                                 <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
@@ -2997,13 +3208,13 @@ const StudentPortfolio: React.FC = () => {
                               </p>
                               <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                               {!isReel && item.tags && item.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-2">
                                   {item.tags.map((tag) => (
-                                  <span key={tag} className="tag-badge">
-                                    #{tag}
-                                  </span>
-                                ))}
-                              </div>
+                                    <span key={tag} className="tag-badge">
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                               {/* Comments Section */}
                               {item.comments_count > 0 && (
@@ -3032,21 +3243,19 @@ const StudentPortfolio: React.FC = () => {
                                       ))}
                                     </div>
                                   )}
-                                  {!expandedComments[itemId] && item.comments_count > 2 && (
-                                    <button
-                                      onClick={async () => {
-                                        if (!expandedComments[itemId]) {
-                                          await fetchPostComments(itemId);
-                                          setExpandedComments(prev => ({ ...prev, [itemId]: true }));
-                                        } else {
-                                          setExpandedComments(prev => ({ ...prev, [itemId]: false }));
-                                        }
-                                      }}
-                                      className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
-                                    >
-                                      Voir tous les commentaires ({item.comments_count})
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={async () => {
+                                      if (!expandedComments[itemId]) {
+                                        await fetchPostComments(itemId);
+                                        setExpandedComments(prev => ({ ...prev, [itemId]: true }));
+                                      } else {
+                                        setExpandedComments(prev => ({ ...prev, [itemId]: false }));
+                                      }
+                                    }}
+                                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    {expandedComments[itemId] ? 'Hide comments' : `View all ${item.comments_count} comments`}
+                                  </button>
                                 </>
                               )}
                               <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
@@ -3055,216 +3264,6 @@ const StudentPortfolio: React.FC = () => {
                         </Card>
                       );
                     })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent flex items-center justify-center">
-                        <GraduationCap className="w-8 h-8 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-2">Aucun post tendance</h3>
-                      <p className="text-muted-foreground text-sm">Les posts les plus interactifs apparaîtront ici</p>
-                    </div>
-                  )
-                ) : (
-                  /* Section Tous les posts */
-                  <div className="space-y-4">
-                    {feedItemsAll.map((item, index) => {
-                const isReel = item.type === 'reel';
-                const itemId = item.id;
-                const itemPostOrReel: PostOrReel = isReel 
-                  ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const }
-                  : item as ProjectPost;
-                
-                return (
-                <Card key={itemId} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
-                  {/* Post/Reel Header */}
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar 
-                        className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all" 
-                        onClick={() => setViewingUserId(item.user_id)}
-                      >
-                        <AvatarImage src={item.profiles.avatar_url} />
-                        <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p
-                          className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => setViewingUserId(item.user_id)}
-                        >
-                          {item.profiles.full_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="rounded-full">
-                      <MoreHorizontal className="h-5 w-5" />
-                    </Button>
-                  </div>
-
-                  {/* Post/Reel Media */}
-                  <div className="relative bg-muted">
-                    {isReel && item.video_url ? (
-                      <video
-                        src={item.video_url}
-                        className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                        onClick={() => setSelectedPost(itemPostOrReel)}
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <>
-                    {item.images.length > 1 && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
-                              onClick={() =>
-                                setCurrentImageIndex(prev => ({
-                                  ...prev,
-                                  [itemId]: Math.max(0, (prev[itemId] ?? 0) - 1)
-                                }))
-                              }
-                        >
-                          <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-card/80 backdrop-blur-sm hover:bg-card shadow-lg z-10"
-                              onClick={() =>
-                                setCurrentImageIndex(prev => ({
-                                  ...prev,
-                                  [itemId]: Math.min(item.images.length - 1, (prev[itemId] ?? 0) + 1)
-                                }))
-                              }
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </Button>
-                      </>
-                    )}
-                    <img
-                          src={item.images[(currentImageIndex[itemId] ?? 0) % item.images.length]}
-                          alt={item.title}
-                      className="w-full aspect-square object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                          onClick={() => setSelectedPost(itemPostOrReel)}
-                    />
-                        {item.images.length > 1 && (
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                            {item.images.map((_, idx) => (
-                          <div
-                            key={idx}
-                                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === (currentImageIndex[itemId] ?? 0) ? 'bg-primary scale-125' : 'bg-white/60'
-                              }`}
-                          />
-                        ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {isReel && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
-                          <Video className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Post/Reel Actions & Content */}
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleLike(itemId)}
-                          className={`rounded-full ${item.liked_by_user ? 'text-primary' : ''}`}
-                        >
-                          <Heart className={`h-6 w-6 transition-all ${item.liked_by_user ? 'fill-primary text-primary scale-110' : ''}`} />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedPost(itemPostOrReel)} className="rounded-full">
-                          <MessageCircle className="h-6 w-6" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="rounded-full">
-                          <Share2 className="h-6 w-6" />
-                        </Button>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleSave(itemId)}
-                        className={`rounded-full ${item.saved_by_user ? 'text-primary' : ''}`}
-                      >
-                        <Bookmark className={`h-6 w-6 ${item.saved_by_user ? 'fill-primary' : ''}`} />
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="font-semibold text-sm">{item.likes_count} likes</p>
-                      <p className="text-sm">
-                        <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username}</span>{' '}
-                        <span className="font-bold text-foreground">{item.title}</span>
-                      </p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
-                      {!isReel && item.tags && item.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                          {item.tags.map((tag) => (
-                          <span key={tag} className="tag-badge">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                      )}
-                      {/* Comments Section */}
-                      {item.comments_count > 0 && (
-                        <>
-                          {!expandedComments[itemId] && postComments[itemId] && postComments[itemId].length > 0 && (
-                            <div className="space-y-2 mt-2">
-                              {postComments[itemId].slice(-2).map((comment) => (
-                                <div key={comment.id} className="flex gap-2">
-                                  <p className="text-sm">
-                                    <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
-                                    <span className="text-foreground">{comment.text}</span>
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {expandedComments[itemId] && postComments[itemId] && (
-                            <div className="space-y-2 mt-2">
-                              {postComments[itemId].map((comment) => (
-                                <div key={comment.id} className="flex gap-2">
-                                  <p className="text-sm">
-                                    <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
-                                    <span className="text-foreground">{comment.text}</span>
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                      <button
-                            onClick={async () => {
-                              if (!expandedComments[itemId]) {
-                                await fetchPostComments(itemId);
-                                setExpandedComments(prev => ({ ...prev, [itemId]: true }));
-                              } else {
-                                setExpandedComments(prev => ({ ...prev, [itemId]: false }));
-                              }
-                            }}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                            {expandedComments[itemId] ? 'Hide comments' : `View all ${item.comments_count} comments`}
-                      </button>
-                        </>
-                      )}
-                      <p className="text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                );
-              })}
                   </div>
                 )}
               </>
@@ -3388,6 +3387,11 @@ const StudentPortfolio: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'admin' && (
+          <AdminDashboard onBack={() => setActiveTab('profile')} />
+        )}
+
+
         {activeTab === 'profile' && (
           <div className="space-y-8 animate-fade-up">
             {/* Profile Header */}
@@ -3407,7 +3411,7 @@ const StudentPortfolio: React.FC = () => {
                   {(userProfile?.github_url || userProfile?.linkedin_url) && (
                     <div className="flex items-center gap-4 mt-4">
                       {userProfile?.github_url && (
-                        <a 
+                        <a
                           href={userProfile.github_url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -3418,7 +3422,7 @@ const StudentPortfolio: React.FC = () => {
                         </a>
                       )}
                       {userProfile?.linkedin_url && (
-                        <a 
+                        <a
                           href={userProfile.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -3432,34 +3436,45 @@ const StudentPortfolio: React.FC = () => {
                   )}
 
                   {user && (
-                    <Button variant="outline" className="mt-4" onClick={() => setIsEditProfileOpen(true)}>
-                      Edit Profile
-                    </Button>
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" onClick={() => setIsEditProfileOpen(true)}>
+                        Edit Profile
+                      </Button>
+                      {userProfile?.role === 'admin' && (
+                        <Button
+                          variant="outline"
+                          className="border-primary text-primary hover:bg-primary/10"
+                          onClick={() => setActiveTab('admin')}
+                        >
+                          <Shield className="w-4 h-4 mr-2" />
+                          Admin
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-foreground">{posts.filter(p => p.user_id === user?.id).length}</p>
-                  <p className="text-xs text-muted-foreground">Projects</p>
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{posts.filter(p => p.user_id === user?.id).length}</p>
+                    <p className="text-xs text-muted-foreground">Projects</p>
+                  </div>
+                  <button
+                    onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'followers' })}
+                    className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <p className="text-2xl font-bold text-foreground">{followersCount}</p>
+                    <p className="text-xs text-muted-foreground">Followers</p>
+                  </button>
+                  <button
+                    onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'following' })}
+                    className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <p className="text-2xl font-bold text-foreground">{followingCount}</p>
+                    <p className="text-xs text-muted-foreground">Following</p>
+                  </button>
                 </div>
-                <button
-                  onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'followers' })}
-                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <p className="text-2xl font-bold text-foreground">{followersCount}</p>
-                  <p className="text-xs text-muted-foreground">Followers</p>
-                </button>
-                <button
-                  onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'following' })}
-                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <p className="text-2xl font-bold text-foreground">{followingCount}</p>
-                  <p className="text-xs text-muted-foreground">Following</p>
-                </button>
-              </div>
             </Card>
 
             {/* Profile Highlights Section */}
@@ -3467,7 +3482,7 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
                 {/* Add New Highlight - Only visible on own profile */}
                 {user && (
-                  <button 
+                  <button
                     onClick={() => setShowHighlightModal(true)}
                     className="flex flex-col items-center gap-2 flex-shrink-0 group"
                   >
@@ -3480,15 +3495,15 @@ const StudentPortfolio: React.FC = () => {
 
                 {/* Profile Highlights from State */}
                 {profileHighlights.map((highlight) => (
-                  <button 
-                    key={highlight.id} 
+                  <button
+                    key={highlight.id}
                     onClick={() => openHighlightViewer(highlight)}
                     className="flex flex-col items-center gap-2 flex-shrink-0 group"
                   >
                     <div className="relative">
                       <div className="w-[68px] h-[68px] rounded-full border border-border p-0.5 bg-card overflow-hidden group-hover:border-primary/50 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all duration-300">
-                        <img 
-                          src={highlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} 
+                        <img
+                          src={highlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'}
                           alt={highlight.title}
                           className="w-full h-full rounded-full object-cover group-hover:scale-110 transition-transform duration-300"
                         />
@@ -3515,50 +3530,50 @@ const StudentPortfolio: React.FC = () => {
                 ]
                   .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                   .map((item) => (
-                  <div 
-                    key={item.id} 
-                    className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1" 
-                    onClick={() => {
-                      // Convert to PostOrReel format for the dialog
-                      if (item.type === 'reel') {
-                        const reelItem: PostOrReel = {
-                          ...item,
-                          images: [item.video_url],
-                          tags: [],
-                        };
-                        setSelectedPost(reelItem);
-                      } else {
-                        setSelectedPost(item as ProjectPost);
-                      }
-                    }}
-                  >
-                    {item.type === 'reel' && item.video_url ? (
-                      <video 
-                        src={item.video_url} 
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    )}
-                    {/* Video indicator for reels */}
-                    {item.type === 'reel' && (
-                      <div className="absolute top-2 right-2 z-10">
-                        <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
-                          <Video className="w-4 h-4 text-white" />
+                    <div
+                      key={item.id}
+                      className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1"
+                      onClick={() => {
+                        // Convert to PostOrReel format for the dialog
+                        if (item.type === 'reel') {
+                          const reelItem: PostOrReel = {
+                            ...item,
+                            images: [item.video_url],
+                            tags: [],
+                          };
+                          setSelectedPost(reelItem);
+                        } else {
+                          setSelectedPost(item as ProjectPost);
+                        }
+                      }}
+                    >
+                      {item.type === 'reel' && item.video_url ? (
+                        <video
+                          src={item.video_url}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      )}
+                      {/* Video indicator for reels */}
+                      {item.type === 'reel' && (
+                        <div className="absolute top-2 right-2 z-10">
+                          <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                            <Video className="w-4 h-4 text-white" />
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                        <p className="font-bold text-white text-sm">{item.title}</p>
+                        <div className="flex items-center gap-3 mt-1 text-white/80 text-xs">
+                          <span className="flex items-center gap-1"><Heart className="w-3 h-3 fill-white" /> {item.likes_count}</span>
+                          <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> {item.comments_count}</span>
                         </div>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                      <p className="font-bold text-white text-sm">{item.title}</p>
-                      <div className="flex items-center gap-3 mt-1 text-white/80 text-xs">
-                        <span className="flex items-center gap-1"><Heart className="w-3 h-3 fill-white" /> {item.likes_count}</span>
-                        <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> {item.comments_count}</span>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
               {posts.filter(p => p.user_id === user?.id).length === 0 && reels.filter(r => r.user_id === user?.id).length === 0 && (
                 <Card className="p-8 text-center">
@@ -3593,9 +3608,9 @@ const StudentPortfolio: React.FC = () => {
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     {savedPosts.map((item) => (
-                      <div 
-                        key={item.id} 
-                        className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1" 
+                      <div
+                        key={item.id}
+                        className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1"
                         onClick={() => {
                           // Convert to PostOrReel format for the dialog
                           if (item.type === 'reel') {
@@ -3611,8 +3626,8 @@ const StudentPortfolio: React.FC = () => {
                         }}
                       >
                         {item.type === 'reel' ? (
-                          <video 
-                            src={item.video_url} 
+                          <video
+                            src={item.video_url}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             muted
                             playsInline
@@ -3657,16 +3672,16 @@ const StudentPortfolio: React.FC = () => {
           {/* Reels Container with Snap Scroll */}
           <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
             {reels.length === 0 ? (
-            <div className="h-screen w-full snap-start relative flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
+              <div className="h-screen w-full snap-start relative flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
                 <div className="text-center">
                   <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center">
                     <Clapperboard className="w-10 h-10 text-white" />
-                </div>
+                  </div>
                   <h3 className="text-white font-bold text-lg mb-2">Aucun Reel pour le moment</h3>
                   <p className="text-white/60 text-sm mb-4">Soyez le premier à partager un Reel !</p>
                   {user && (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="rounded-full border-white/30 text-white hover:bg-white/10"
                       onClick={() => setIsCreateReelOpen(true)}
                     >
@@ -3674,19 +3689,19 @@ const StudentPortfolio: React.FC = () => {
                       Créer un Reel
                     </Button>
                   )}
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="rounded-full text-white/60 hover:text-white hover:bg-white/10 mt-2"
                     onClick={() => setActiveTab('home')}
                   >
                     Retour à l'accueil
                   </Button>
-              </div>
+                </div>
               </div>
             ) : (
               reels.map((reel, index) => (
-                <div 
-                  key={reel.id} 
+                <div
+                  key={reel.id}
                   ref={(el) => {
                     if (el) {
                       reelContainerRefs.current[reel.id] = el;
@@ -3721,27 +3736,27 @@ const StudentPortfolio: React.FC = () => {
                       }
                     }}
                   />
-              
-              {/* User Info - Bottom Left */}
-              <div className="absolute bottom-24 left-4 right-20 z-10">
-                <div className="flex items-center gap-3 mb-3">
-                      <Avatar 
+
+                  {/* User Info - Bottom Left */}
+                  <div className="absolute bottom-24 left-4 right-20 z-10">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Avatar
                         className="w-10 h-10 ring-2 ring-white/20 cursor-pointer"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
                         <AvatarImage src={reel.profiles.avatar_url} />
                         <AvatarFallback>{reel.profiles.username[0]}</AvatarFallback>
-                  </Avatar>
-                      <span 
+                      </Avatar>
+                      <span
                         className="text-white font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
                         @{reel.profiles.username}
                       </span>
                       {user && reel.user_id !== user.id && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="h-7 rounded-full border-white/30 text-white text-xs hover:bg-white/10"
                           onClick={async (e) => {
                             e.stopPropagation();
@@ -3761,58 +3776,58 @@ const StudentPortfolio: React.FC = () => {
                           ) : (
                             'Follow'
                           )}
-                  </Button>
+                        </Button>
                       )}
-                </div>
+                    </div>
                     {reel.description && (
-                <p className="text-white text-sm leading-relaxed">
+                      <p className="text-white text-sm leading-relaxed">
                         {reel.description}
-                </p>
+                      </p>
                     )}
-                <div className="flex items-center gap-2 mt-2">
-                  <Music className="w-3 h-3 text-white/60" />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Music className="w-3 h-3 text-white/60" />
                       <span className="text-white/60 text-xs">Original Sound - {reel.profiles.username}</span>
-                </div>
-              </div>
+                    </div>
+                  </div>
 
-              {/* Action Buttons - Right Side */}
-              <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
-                    <button 
+                  {/* Action Buttons - Right Side */}
+                  <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
+                    <button
                       className="flex flex-col items-center gap-1 group"
                       onClick={() => handleLike(reel.id)}
                     >
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
                         <Heart className={`w-6 h-6 ${reel.liked_by_user ? 'text-[#ed3d66] fill-[#ed3d66]' : 'text-white'}`} />
-                  </div>
+                      </div>
                       <span className="text-white text-xs font-medium">
                         {reel.likes_count > 0 ? (reel.likes_count > 1000 ? `${(reel.likes_count / 1000).toFixed(1)}K` : reel.likes_count) : ''}
                       </span>
-                </button>
-                <button className="flex flex-col items-center gap-1 group">
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                    <MessageCircle className="w-6 h-6 text-white" />
-                  </div>
+                    </button>
+                    <button className="flex flex-col items-center gap-1 group">
+                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                        <MessageCircle className="w-6 h-6 text-white" />
+                      </div>
                       <span className="text-white text-xs font-medium">
                         {reel.comments_count > 0 ? (reel.comments_count > 1000 ? `${(reel.comments_count / 1000).toFixed(1)}K` : reel.comments_count) : ''}
                       </span>
-                </button>
-                    <button 
+                    </button>
+                    <button
                       className="flex flex-col items-center gap-1 group"
                       onClick={() => handleSave(reel.id)}
                     >
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
                         <Bookmark className={`w-6 h-6 ${reel.saved_by_user ? 'text-primary fill-primary' : 'text-white'}`} />
+                      </div>
+                      <span className="text-white text-xs font-medium">Save</span>
+                    </button>
+                    <button className="flex flex-col items-center gap-1 group">
+                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                        <Share2 className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-white text-xs font-medium">Share</span>
+                    </button>
                   </div>
-                  <span className="text-white text-xs font-medium">Save</span>
-                </button>
-                <button className="flex flex-col items-center gap-1 group">
-                  <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                    <Share2 className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-medium">Share</span>
-                </button>
-              </div>
-              </div>
+                </div>
               ))
             )}
           </div>
@@ -3821,9 +3836,9 @@ const StudentPortfolio: React.FC = () => {
           <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-20">
             <div className="flex items-center justify-between">
               <h1 className="text-white font-bold text-xl">Reels</h1>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="text-white hover:bg-white/10 rounded-full"
                 onClick={() => setActiveTab('home')}
               >
@@ -3864,7 +3879,7 @@ const StudentPortfolio: React.FC = () => {
               <h2 className="text-xl font-bold text-foreground">Create New</h2>
               <p className="text-sm text-muted-foreground mt-1">What would you like to share?</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               {/* Post Option */}
               <button
@@ -3921,8 +3936,8 @@ const StudentPortfolio: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <h2 className="text-lg font-bold text-foreground">New Highlight</h2>
-              <Button 
-                variant="brand" 
+              <Button
+                variant="brand"
                 size="sm"
                 onClick={handleCreateHighlight}
                 disabled={!highlightName.trim() || selectedArchivedStories.length === 0}
@@ -3948,7 +3963,7 @@ const StudentPortfolio: React.FC = () => {
                 <p className="text-sm font-medium text-foreground">Select Stories</p>
                 <span className="text-xs text-muted-foreground">{selectedArchivedStories.length} selected</span>
               </div>
-              
+
               {loadingArchivedStories ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -3961,32 +3976,31 @@ const StudentPortfolio: React.FC = () => {
                   <p className="text-xs text-muted-foreground mt-1">Créez des stories pour pouvoir les ajouter à vos highlights</p>
                 </div>
               ) : (
-              <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {userArchivedStories.map((story) => {
-                  const isSelected = selectedArchivedStories.includes(story.id);
-                  return (
-                    <button
-                      key={story.id}
-                      onClick={() => toggleArchivedStorySelection(story.id)}
-                      className={`relative aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all ${
-                        isSelected 
-                          ? 'border-primary ring-2 ring-primary/30' 
+                    const isSelected = selectedArchivedStories.includes(story.id);
+                    return (
+                      <button
+                        key={story.id}
+                        onClick={() => toggleArchivedStorySelection(story.id)}
+                        className={`relative aspect-[9/16] rounded-xl overflow-hidden border-2 transition-all ${isSelected
+                          ? 'border-primary ring-2 ring-primary/30'
                           : 'border-transparent hover:border-border'
-                      }`}
-                    >
+                          }`}
+                      >
                         {story.media_type === 'video' ? (
-                          <video 
-                            src={story.media_url || story.image} 
+                          <video
+                            src={story.media_url || story.image}
                             className="w-full h-full object-cover"
                             muted
                             playsInline
                           />
                         ) : (
-                          <img 
-                            src={story.media_url || story.image} 
-                        alt="Story" 
-                        className="w-full h-full object-cover"
-                      />
+                          <img
+                            src={story.media_url || story.image}
+                            alt="Story"
+                            className="w-full h-full object-cover"
+                          />
                         )}
                         {/* Video indicator */}
                         {story.media_type === 'video' && (
@@ -3994,26 +4008,26 @@ const StudentPortfolio: React.FC = () => {
                             <Video className="w-4 h-4 text-white drop-shadow-lg" />
                           </div>
                         )}
-                      {/* Selection overlay */}
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
+                        {/* Selection overlay */}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                      {/* Date */}
-                      <div className="absolute bottom-1 left-1 right-1">
-                        <span className="text-[10px] text-white/80 bg-black/40 px-1.5 py-0.5 rounded-full">
+                        )}
+                        {/* Date */}
+                        <div className="absolute bottom-1 left-1 right-1">
+                          <span className="text-[10px] text-white/80 bg-black/40 px-1.5 py-0.5 rounded-full">
                             {new Date(story.created_at).toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -4023,18 +4037,18 @@ const StudentPortfolio: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full border border-border overflow-hidden">
                     {userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.media_type === 'video' ? (
-                      <video 
-                        src={userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.media_url || userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.image} 
+                      <video
+                        src={userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.media_url || userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.image}
                         className="w-full h-full object-cover"
                         muted
                         playsInline
                       />
                     ) : (
-                      <img 
-                        src={userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.media_url || userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.image} 
-                      alt="Cover" 
-                      className="w-full h-full object-cover"
-                    />
+                      <img
+                        src={userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.media_url || userArchivedStories.find(s => s.id === selectedArchivedStories[0])?.image}
+                        alt="Cover"
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
                   <div className="flex-1">
@@ -4073,11 +4087,11 @@ const StudentPortfolio: React.FC = () => {
                       }}
                     />
                   ) : (
-                <img
-                  src={selectedPost.images[0]}
-                  alt={selectedPost.title}
-                  className="max-w-full max-h-full object-contain"
-                />
+                    <img
+                      src={selectedPost.images[0]}
+                      alt={selectedPost.title}
+                      className="max-w-full max-h-full object-contain"
+                    />
                   )}
                 </>
               )}
@@ -4101,13 +4115,13 @@ const StudentPortfolio: React.FC = () => {
                   <h3 className="font-bold text-xl text-foreground">{selectedPost?.title}</h3>
                   <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{selectedPost?.description}</p>
                   {selectedPost?.tags && selectedPost.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="flex flex-wrap gap-2 mt-3">
                       {selectedPost.tags.map((tag) => (
-                      <span key={tag} className="tag-badge">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
+                        <span key={tag} className="tag-badge">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -4140,10 +4154,10 @@ const StudentPortfolio: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                  <div className="text-center py-8">
-                    <MessageCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No comments yet. Be the first!</p>
-                  </div>
+                    <div className="text-center py-8">
+                      <MessageCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No comments yet. Be the first!</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -4230,13 +4244,12 @@ const StudentPortfolio: React.FC = () => {
                     onClick={() => setCurrentStoryIndex(idx)}
                   >
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        idx < currentStoryIndex 
-                          ? 'bg-white w-full' 
-                          : idx === currentStoryIndex 
-                            ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] animate-pulse w-full' 
-                            : 'bg-transparent w-0'
-                      }`}
+                      className={`h-full rounded-full transition-all duration-300 ${idx < currentStoryIndex
+                        ? 'bg-white w-full'
+                        : idx === currentStoryIndex
+                          ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] animate-pulse w-full'
+                          : 'bg-transparent w-0'
+                        }`}
                     />
                   </div>
                 ))}
@@ -4269,9 +4282,9 @@ const StudentPortfolio: React.FC = () => {
             {/* Story Content */}
             {selectedUserStories.stories[currentStoryIndex] && (
               <div className="w-full h-full relative">
-                {selectedUserStories.stories[currentStoryIndex].media_type === 'video' || 
-                 (selectedUserStories.stories[currentStoryIndex].media_url && 
-                  selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].image_url) ? (
+                {selectedUserStories.stories[currentStoryIndex].media_type === 'video' ||
+                  (selectedUserStories.stories[currentStoryIndex].media_url &&
+                    selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].image_url) ? (
                   <video
                     ref={(video) => {
                       // Auto-unmute when video is ready (after user interaction with opening the story)
@@ -4295,9 +4308,9 @@ const StudentPortfolio: React.FC = () => {
                 ) : (
                   <img
                     src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
-                  alt="Story"
-                  className="w-full h-full object-cover"
-                />
+                    alt="Story"
+                    className="w-full h-full object-cover"
+                  />
                 )}
                 {selectedUserStories.stories[currentStoryIndex].description && (
                   <div className="absolute bottom-20 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
@@ -4314,26 +4327,25 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex items-center justify-center gap-6">
                 {/* Reply Input */}
                 <div className="flex-1 flex items-center gap-2">
-                  <Input 
-                    placeholder="Send message..." 
+                  <Input
+                    placeholder="Send message..."
                     className="h-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 rounded-full"
                   />
                 </div>
-                
+
                 {/* Add to Highlight Button */}
                 {user && (
                   <div className="relative">
                     <button
                       onClick={() => setShowAddToHighlight(!showAddToHighlight)}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                        showAddToHighlight 
-                          ? 'bg-primary text-white' 
-                          : 'bg-white/10 text-white hover:bg-white/20'
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showAddToHighlight
+                        ? 'bg-primary text-white'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                        }`}
                     >
                       <Heart className="w-5 h-5" />
                     </button>
-                    
+
                     {/* Highlight Selection Menu */}
                     {showAddToHighlight && (
                       <div className="absolute bottom-14 right-0 w-48 bg-card rounded-xl shadow-2xl border border-border overflow-hidden animate-scale-in">
@@ -4382,13 +4394,13 @@ const StudentPortfolio: React.FC = () => {
 
             {/* Tap zones for navigation */}
             <div className="absolute inset-0 flex z-10">
-              <div 
-                className="w-1/3 h-full cursor-pointer" 
+              <div
+                className="w-1/3 h-full cursor-pointer"
                 onClick={handlePrevStory}
               />
               <div className="w-1/3 h-full" />
-              <div 
-                className="w-1/3 h-full cursor-pointer" 
+              <div
+                className="w-1/3 h-full cursor-pointer"
                 onClick={handleNextStory}
               />
             </div>
@@ -4435,13 +4447,12 @@ const StudentPortfolio: React.FC = () => {
                     onClick={() => setHighlightStoryIndex(idx)}
                   >
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        idx < highlightStoryIndex 
-                          ? 'bg-white w-full' 
-                          : idx === highlightStoryIndex 
-                            ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] w-full' 
-                            : 'bg-transparent w-0'
-                      }`}
+                      className={`h-full rounded-full transition-all duration-300 ${idx < highlightStoryIndex
+                        ? 'bg-white w-full'
+                        : idx === highlightStoryIndex
+                          ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] w-full'
+                          : 'bg-transparent w-0'
+                        }`}
                     />
                   </div>
                 ))}
@@ -4464,9 +4475,9 @@ const StudentPortfolio: React.FC = () => {
             {/* Story Content */}
             {viewingHighlight.stories[highlightStoryIndex] && (
               <div className="w-full h-full relative">
-                {viewingHighlight.stories[highlightStoryIndex].media_type === 'video' || 
-                 (viewingHighlight.stories[highlightStoryIndex].media_url && 
-                  viewingHighlight.stories[highlightStoryIndex].media_url !== viewingHighlight.stories[highlightStoryIndex].image) ? (
+                {viewingHighlight.stories[highlightStoryIndex].media_type === 'video' ||
+                  (viewingHighlight.stories[highlightStoryIndex].media_url &&
+                    viewingHighlight.stories[highlightStoryIndex].media_url !== viewingHighlight.stories[highlightStoryIndex].image) ? (
                   <video
                     ref={(video) => {
                       // Auto-unmute when video is ready (after user interaction with opening the highlight)
@@ -4490,9 +4501,9 @@ const StudentPortfolio: React.FC = () => {
                 ) : (
                   <img
                     src={viewingHighlight.stories[highlightStoryIndex].media_url || viewingHighlight.stories[highlightStoryIndex].image}
-                  alt="Highlight Story"
-                  className="w-full h-full object-cover"
-                />
+                    alt="Highlight Story"
+                    className="w-full h-full object-cover"
+                  />
                 )}
                 {viewingHighlight.stories[highlightStoryIndex].description && (
                   <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">

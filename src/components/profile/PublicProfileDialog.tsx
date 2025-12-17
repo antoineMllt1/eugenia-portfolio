@@ -22,6 +22,7 @@ interface ProfileData {
     avatar_url: string
     bio?: string
     course?: string
+    role?: string
 }
 
 interface ProjectPost {
