@@ -2,10 +2,10 @@
 
 import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Sun, Moon, Sparkles, ChevronDown, Check } from "lucide-react"
+import { Sun, Moon, Sparkles, GraduationCap, ChevronDown, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Theme = "light" | "dark" | "eugenia"
+type Theme = "light" | "dark" | "eugenia" | "albert"
 
 interface ThemeOption {
   id: Theme
@@ -32,6 +32,12 @@ const themes: ThemeOption[] = [
     label: "Eugenia",
     icon: Sparkles,
     description: "Brand energy"
+  },
+  {
+    id: "albert",
+    label: "Albert",
+    icon: GraduationCap,
+    description: "Professional blue"
   }
 ]
 
@@ -43,7 +49,7 @@ const ThemeSwitcher: React.FC = () => {
   // Load theme from localStorage on mount
   React.useEffect(() => {
     const savedTheme = localStorage.getItem("eugenia-theme") as Theme | null
-    if (savedTheme && ["light", "dark", "eugenia"].includes(savedTheme)) {
+    if (savedTheme && ["light", "dark", "eugenia", "albert"].includes(savedTheme)) {
       setCurrentTheme(savedTheme)
       applyTheme(savedTheme)
     } else {
@@ -70,7 +76,7 @@ const ThemeSwitcher: React.FC = () => {
   const applyTheme = (theme: Theme) => {
     document.documentElement.setAttribute("data-theme", theme)
     // Also add/remove dark class for Tailwind dark mode compatibility
-    if (theme === "dark" || theme === "eugenia") {
+    if (theme === "dark" || theme === "eugenia" || theme === "albert") {
       document.documentElement.classList.add("dark")
     } else {
       document.documentElement.classList.remove("dark")
@@ -111,6 +117,7 @@ const ThemeSwitcher: React.FC = () => {
           <CurrentIcon className={cn(
             "h-4 w-4",
             currentTheme === "eugenia" && "text-[#f97316]",
+            currentTheme === "albert" && "text-[#245076]",
             currentTheme === "dark" && "text-blue-400",
             currentTheme === "light" && "text-amber-500"
           )} />
@@ -160,12 +167,14 @@ const ThemeSwitcher: React.FC = () => {
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center",
                     theme.id === "eugenia" && "bg-gradient-to-br from-[#ed3d66] to-[#f97316]",
+                    theme.id === "albert" && "bg-gradient-to-br from-[#245076] to-[#3a6fa5]",
                     theme.id === "dark" && "bg-slate-800",
                     theme.id === "light" && "bg-amber-100"
                   )}>
                     <Icon className={cn(
                       "h-4 w-4",
                       theme.id === "eugenia" && "text-white",
+                      theme.id === "albert" && "text-white",
                       theme.id === "dark" && "text-blue-400",
                       theme.id === "light" && "text-amber-600"
                     )} />

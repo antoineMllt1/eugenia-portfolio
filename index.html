@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
   
-  <title>Eugenia Portfolio | Student Projects</title>
+  <title>Eugeniagram | Student Projects</title>
   <meta name="description" content="Discover innovative student projects from Eugenia School - Data & Business">
   
   <script>
@@ -20,19 +20,20 @@
       // Theme color mappings
       const themeColors = {
         light: { bg: '#FAFAFA', text: '#0F172A', muted: '#64748B' },
-        dark: { bg: '#0F172A', text: '#F8FAFC', muted: '#94A3B8' },
-        eugenia: { bg: '#0A0A0A', text: '#F8FAFC', muted: '#94A3B8' }
+        dark: { bg: '#000000', text: '#FFFFFF', muted: '#a0a0a0' },
+        eugenia: { bg: '#0A0A0A', text: '#F8FAFC', muted: '#94A3B8' },
+        albert: { bg: '#0a1118', text: '#E8F0F8', muted: 'rgba(232, 240, 248, 0.7)' }
       };
       
       let currentTheme = 'light';
       const savedTheme = localStorage.getItem('eugenia-theme');
       
-      if (savedTheme && ['light', 'dark', 'eugenia'].includes(savedTheme)) {
+      if (savedTheme && ['light', 'dark', 'eugenia', 'albert'].includes(savedTheme)) {
         currentTheme = savedTheme;
         document.documentElement.setAttribute('data-theme', savedTheme);
         // Remove dark class first, then add it only if needed
         document.documentElement.classList.remove('dark');
-        if (savedTheme === 'dark' || savedTheme === 'eugenia') {
+        if (savedTheme === 'dark' || savedTheme === 'eugenia' || savedTheme === 'albert') {
           document.documentElement.classList.add('dark');
         }
       } else {
@@ -88,7 +89,7 @@
       
       const themeColors = {
         light: { muted: '#64748B' },
-        dark: { muted: '#94A3B8' },
+        dark: { muted: '#a0a0a0' },
         eugenia: { muted: '#94A3B8' }
       };
       

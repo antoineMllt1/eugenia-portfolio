@@ -2223,6 +2223,15 @@ const StudentPortfolio: React.FC = () => {
                   >
                     <SquarePlus className="w-5 h-5" />
                   </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full w-8 h-8 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setIsMessagesOpen(false)}
+                    title="Fermer les messages"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
                 </div>
               </div>
               
@@ -2353,7 +2362,7 @@ const StudentPortfolio: React.FC = () => {
                       )}
                     </div>
                     
-                    {/* Boutons d'action Instagram (appel vidéo, appel, info) */}
+                    {/* Boutons d'action Instagram (appel vidéo, appel, info) + Fermer */}
                     <div className="flex items-center gap-1">
                       <Button 
                         variant="ghost" 
@@ -2384,6 +2393,15 @@ const StudentPortfolio: React.FC = () => {
                         }}
                       >
                         <Info className="w-5 h-5" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="rounded-full w-9 h-9 hover:bg-destructive/10 hover:text-destructive"
+                        title="Fermer les messages"
+                        onClick={() => setIsMessagesOpen(false)}
+                      >
+                        <X className="w-5 h-5" />
                       </Button>
                     </div>
                   </div>
@@ -2614,13 +2632,7 @@ const StudentPortfolio: React.FC = () => {
             
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-brand flex items-center justify-center shadow-lg shadow-primary/20">
-                <GraduationCap className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground tracking-tight">Eugenia</h1>
-                <p className="text-xs text-muted-foreground -mt-0.5">Portfolio</p>
-              </div>
+              <h1 className="text-xl font-bold text-foreground tracking-tight">Eugeniagram</h1>
             </div>
           </div>
           <div className="flex items-center gap-3">

@@ -29,7 +29,7 @@ Ce guide explique comment configurer l'envoi d'emails de notification lorsqu'une
 
 1. Dans Resend Dashboard, allez dans **API Keys**
 2. Cliquez sur **Create API Key**
-3. Donnez-lui un nom (ex: "Eugenia Portfolio")
+3. Donnez-lui un nom (ex: "Eugeniagram")
 4. Copiez la clé API (elle ne sera affichée qu'une seule fois)
 
 ### Étape 3 : Déployer l'Edge Function Supabase

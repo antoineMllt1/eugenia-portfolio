@@ -8,7 +8,7 @@ Si `npm run supabase:login` ne fonctionne pas, voici comment se connecter avec u
 
 1. Va sur [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
 2. Clique sur **Generate new token**
-3. Donne-lui un nom (ex: "Eugenia Portfolio")
+3. Donne-lui un nom (ex: "Eugeniagram")
 4. **Copie le token** (il ne sera affiché qu'une seule fois !)
 
 ### 2. Configurer le token dans le terminal

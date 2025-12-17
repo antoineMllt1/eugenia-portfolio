@@ -82,7 +82,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Eugenia Portfolio <noreply@eugenia-portfolio.com>', // Change this to your verified domain
+        from: 'Eugeniagram <noreply@eugeniagram.com>', // Change this to your verified domain
         to: [to],
         subject: `${senderName} vous a envoyé un message`,
         html: `
@@ -130,11 +130,11 @@ serve(async (req) => {
             </head>
             <body>
               <div class="header">
-                <h1>Nouveau message sur Eugenia Portfolio</h1>
+                <h1>Nouveau message sur Eugeniagram</h1>
               </div>
               <div class="content">
                 <p>Bonjour,</p>
-                <p><strong>${senderName}</strong>${senderUsername ? ` (@${senderUsername})` : ''} vous a envoyé un message sur Eugenia Portfolio.</p>
+                <p><strong>${senderName}</strong>${senderUsername ? ` (@${senderUsername})` : ''} vous a envoyé un message sur Eugeniagram.</p>
                 <p>Connectez-vous pour voir et répondre à ce message.</p>
                 <div style="text-align: center;">
                   <a href="${Deno.env.get('APP_URL') || 'https://your-app-url.com'}/messages?conversation=${conversationId}" class="button">
@@ -143,7 +143,7 @@ serve(async (req) => {
                 </div>
               </div>
               <div class="footer">
-                <p>Cet email a été envoyé automatiquement par Eugenia Portfolio.</p>
+                <p>Cet email a été envoyé automatiquement par Eugeniagram.</p>
                 <p>Si vous ne souhaitez plus recevoir ces notifications, vous pouvez modifier vos paramètres dans votre profil.</p>
               </div>
             </body>

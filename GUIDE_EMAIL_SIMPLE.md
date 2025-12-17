@@ -35,7 +35,7 @@ Appuie sur **Entrée** pour ouvrir le navigateur et te connecter.
 
 1. Va sur [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
 2. Clique sur **Generate new token**
-3. Donne-lui un nom (ex: "Eugenia Portfolio CLI")
+3. Donne-lui un nom (ex: "Eugeniagram CLI")
 4. Copie le token généré
 5. Dans le terminal, tape (remplace `TON_TOKEN` par le token copié) :
    ```bash
@@ -81,7 +81,7 @@ C'est tout ! La fonction est maintenant déployée.
 2. Crée un compte (gratuit jusqu'à 3000 emails/mois)
 3. Va dans **API Keys**
 4. Clique sur **Create API Key**
-5. Donne-lui un nom (ex: "Eugenia Portfolio")
+5. Donne-lui un nom (ex: "Eugeniagram")
 6. **Copie la clé API** (elle ne sera affichée qu'une seule fois !)
 
 ### Étape 5 : Configurer les secrets dans Supabase
