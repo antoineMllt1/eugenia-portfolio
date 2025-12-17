@@ -1,15 +1,105 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GeniaGram</title>
+  
+  <!-- Google Fonts - DM Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+  
+  <title>Eugeniagram | Student Projects</title>
+  <meta name="description" content="Discover innovative student projects from Eugenia School - Data & Business">
+  
+  <script>
+    // Initialize theme immediately to prevent white screen
+    (function() {
+      // Theme color mappings
+      const themeColors = {
+        light: { bg: '#FAFAFA', text: '#0F172A', muted: '#64748B' },
+        dark: { bg: '#000000', text: '#FFFFFF', muted: '#a0a0a0' },
+        eugenia: { bg: '#0A0A0A', text: '#F8FAFC', muted: '#94A3B8' },
+        albert: { bg: '#0a1118', text: '#E8F0F8', muted: 'rgba(232, 240, 248, 0.7)' }
+      };
+      
+      let currentTheme = 'light';
+      const savedTheme = localStorage.getItem('eugenia-theme');
+      
+      if (savedTheme && ['light', 'dark', 'eugenia', 'albert'].includes(savedTheme)) {
+        currentTheme = savedTheme;
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        // Remove dark class first, then add it only if needed
+        document.documentElement.classList.remove('dark');
+        if (savedTheme === 'dark' || savedTheme === 'eugenia' || savedTheme === 'albert') {
+          document.documentElement.classList.add('dark');
+        }
+      } else {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        currentTheme = prefersDark ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        // Remove dark class first, then add it only if needed
+        document.documentElement.classList.remove('dark');
+        if (currentTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      }
+      
+      // Apply theme colors to body immediately
+      const colors = themeColors[currentTheme];
+      if (document.body) {
+        document.body.style.backgroundColor = colors.bg;
+        document.body.style.color = colors.text;
+      }
+      // Apply to root after DOM is ready
+      const applyRootStyles = () => {
+        const root = document.getElementById('root');
+        if (root) {
+          root.style.backgroundColor = colors.bg;
+          root.style.color = colors.text;
+        }
+      };
+      // Try immediately, then on DOMContentLoaded
+      applyRootStyles();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyRootStyles);
+      }
+    })();
+  </script>
 </head>
 
-<body>
-  <div id="root"></div>
+<body style="margin: 0; padding: 0;">
+  <div id="root" style="min-height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+    <div style="padding: 40px; text-align: center; font-family: sans-serif;">
+      <h1 style="color: #ed3d66; font-size: 32px; margin-bottom: 20px;">Chargement de l'application...</h1>
+      <p id="loading-text" style="font-size: 18px;">Si ce message reste affiché, il y a un problème avec le JavaScript.</p>
+      <p id="loading-hint" style="font-size: 14px; margin-top: 10px;">Ouvrez la console (F12) pour voir les erreurs.</p>
+    </div>
+  </div>
+  <script>
+    // Apply theme colors to loading text after theme initialization
+    (function() {
+      const savedTheme = localStorage.getItem('eugenia-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme && ['light', 'dark', 'eugenia'].includes(savedTheme) 
+        ? savedTheme 
+        : (prefersDark ? 'dark' : 'light');
+      
+      const themeColors = {
+        light: { muted: '#64748B' },
+        dark: { muted: '#a0a0a0' },
+        eugenia: { muted: '#94A3B8' }
+      };
+      
+      const colors = themeColors[theme];
+      const loadingText = document.getElementById('loading-text');
+      const loadingHint = document.getElementById('loading-hint');
+      if (loadingText) loadingText.style.color = colors.muted;
+      if (loadingHint) loadingHint.style.color = colors.muted;
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
