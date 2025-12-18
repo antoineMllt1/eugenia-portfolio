@@ -1,0 +1,44 @@
+/* stylelint-disable */
+/* stylelint-disable-next-line */
+@tailwind base;
+/* stylelint-disable-next-line */
+@tailwind components;
+/* stylelint-disable-next-line */
+@tailwind utilities;
+
+@layer base {
+
+  /* stylelint-disable-next-line */
+  body {
+    /* stylelint-disable-next-line */
+    @apply font-body text-eugenia-dark bg-eugenia-grey;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    /* stylelint-disable-next-line */
+    @apply font-sans font-bold;
+  }
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #ede8eb;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #75192b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e33054;
+}
