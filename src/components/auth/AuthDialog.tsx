@@ -44,21 +44,82 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
 
         try {
             if (isForgotPassword) {
+                // Validation de l'email
+                if (!email || !email.includes('@')) {
+                    setError('Veuillez entrer une adresse email valide.')
+                    return
+                }
+                
+                // Construire l'URL de redirection
+                // Supabase utilise le hash fragment (#access_token=...) pour les SPA
+                // On utilise simplement l'origin - Supabase ajoutera automatiquement le hash avec le token
+                const redirectUrl = `${window.location.origin}${window.location.pathname}`
+                
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/reset-password`,
+                    redirectTo: redirectUrl,
                 })
-                if (error) throw error
-                setSuccessMessage('Un email de réinitialisation a été envoyé à votre adresse email.')
-                // Close dialog after user has time to read the message
-                setTimeout(() => {
-                    onClose()
-                }, 2000)
+                
+                if (error) {
+                    // Log l'erreur pour le debug
+                    console.error('Reset password error:', {
+                        message: error.message,
+                        status: error.status,
+                        name: error.name,
+                    })
+                    
+                    // Messages d'erreur clairs
+                    if (error.message.includes('rate limit') || error.message.includes('too many')) {
+                        throw new Error('Trop de tentatives. Veuillez réessayer dans quelques minutes.')
+                    } else {
+                        // Ne pas révéler si l'email existe ou non (sécurité)
+                        // Toujours afficher le message de succès même si l'email n'existe pas
+                        // (pour éviter l'énumération d'emails)
+                    }
+                }
+                
+                // Toujours afficher le message de succès (même si l'email n'existe pas)
+                // pour éviter l'énumération d'emails
+                setSuccessMessage('Si cette adresse email existe, un lien de réinitialisation a été envoyé. Vérifiez votre boîte de réception et vos spams.')
+                
+                // Réinitialiser le champ email
+                setEmail('')
+                
+                // Ne pas fermer automatiquement, laisser l'utilisateur lire le message
             } else if (isLogin) {
-                const { error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 })
-                if (error) throw error
+                
+                if (error) {
+                    // Log l'erreur complète pour le debug
+                    console.error('Login error:', {
+                        message: error.message,
+                        status: error.status,
+                        name: error.name,
+                    })
+                    
+                    // Messages d'erreur génériques pour éviter les fuites d'information
+                    // Ne pas révéler si l'email existe ou non
+                    if (error.message.includes('Invalid login credentials') || 
+                        error.message.includes('Email not confirmed') ||
+                        error.message.includes('Invalid password') ||
+                        error.message.includes('Wrong password')) {
+                        throw new Error('Email ou mot de passe incorrect')
+                    } else if (error.message.includes('Too many requests')) {
+                        throw new Error('Trop de tentatives. Veuillez réessayer plus tard.')
+                    } else {
+                        // Message générique pour les autres erreurs
+                        throw new Error('Erreur de connexion. Veuillez réessayer.')
+                    }
+                }
+                
+                // Vérifier que la session a bien été créée
+                if (!data.session) {
+                    console.error('No session returned after login')
+                    throw new Error('Erreur de connexion. Veuillez réessayer.')
+                }
+                
                 onClose()
             } else {
                 const { error } = await supabase.auth.signUp({

@@ -11,7 +11,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
     // Create a dummy client with placeholder values
     supabase = createClient('https://placeholder.supabase.co', 'placeholder-key')
 } else {
-    supabase = createClient(supabaseUrl, supabaseAnonKey)
+    // Configuration du client Supabase pour gérer correctement les tokens dans le hash
+    // autoRefreshToken et persistSession sont activés par défaut, mais on les spécifie explicitement
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true, // Important : détecte automatiquement les tokens dans le hash
+        }
+    })
 }
 
 export { supabase }

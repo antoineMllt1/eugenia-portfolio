@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { AuthDialog } from '@/components/auth/AuthDialog';
+import { ResetPasswordDialog } from '@/components/auth/ResetPasswordDialog';
 import { supabase } from '@/lib/supabase';
 import { EditProfileDialog } from './components/profile/EditProfileDialog';
 import { PublicProfileDialog } from './components/profile/PublicProfileDialog';
@@ -123,6 +124,7 @@ const StudentPortfolio: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [selectedUserStories, setSelectedUserStories] = useState<GroupedUserStories | null>(null);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<PostOrReel | null>(null);
@@ -451,6 +453,64 @@ const StudentPortfolio: React.FC = () => {
       }
     }
   };
+
+  // Détecter le token de reset password dans l'URL (hash fragment)
+  // Supabase gère automatiquement les tokens dans le hash et émet un événement PASSWORD_RECOVERY
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    // Vérifier l'URL au chargement initial avec un délai pour laisser Supabase traiter le hash
+    const checkResetToken = () => {
+      const hash = window.location.hash;
+      
+      // Vérifier si on a un token de récupération dans l'URL
+      // Format Supabase: #access_token=...&type=recovery&...
+      // ou parfois juste #access_token=... (le type peut être dans les paramètres)
+      const hasAccessToken = hash.includes('access_token=');
+      const hasRecoveryType = hash.includes('type=recovery');
+      
+      if (hasAccessToken || hasRecoveryType) {
+        // Attendre un peu pour que Supabase traite le hash
+        // puis ouvrir le dialog
+        timeoutId = setTimeout(() => {
+          setResetPasswordOpen(true);
+        }, 500);
+      }
+    };
+
+    // Vérifier au chargement initial
+    checkResetToken();
+
+    // Écouter les changements d'état d'authentification pour détecter les tokens de récupération
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Supabase émet un événement PASSWORD_RECOVERY quand un token de récupération est détecté
+      if (event === 'PASSWORD_RECOVERY') {
+        // Annuler le timeout si on a déjà détecté via l'événement
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        setResetPasswordOpen(true);
+      }
+      
+      // Vérifier aussi manuellement au cas où l'événement ne serait pas émis
+      if (event === 'SIGNED_IN' && session) {
+        const hash = window.location.hash;
+        if (hash.includes('type=recovery') || hash.includes('access_token')) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          setResetPasswordOpen(true);
+        }
+      }
+    });
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -2172,6 +2232,20 @@ const StudentPortfolio: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden w-full pb-24 bg-background">
 
       <AuthDialog isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      <ResetPasswordDialog 
+        isOpen={resetPasswordOpen} 
+        onClose={() => {
+          setResetPasswordOpen(false);
+          // Nettoyer l'URL après fermeture
+          if (window.location.hash.includes('reset-password') || window.location.hash.includes('type=recovery')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }}
+        onSuccess={() => {
+          // Après succès, ouvrir le dialog de connexion
+          setAuthOpen(true);
+        }}
+      />
       <EditProfileDialog
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}
