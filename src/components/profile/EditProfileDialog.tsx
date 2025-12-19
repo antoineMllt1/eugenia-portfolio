@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea' // We might need to create this or use Input
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox'
-import { Loader2, Upload, Github, Linkedin, Sparkles, User } from 'lucide-react'
+import { Loader2, Upload, Github, Linkedin, Sparkles, User, Trash2, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 // Reusing class options from AuthDialog - ideally this should be in a shared constant file
@@ -220,6 +220,81 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             alert(`Failed to update highlight title: ${error.message || 'Unknown error'}`)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleDeleteHighlight = async (highlightId: string) => {
+        if (!user) return
+        
+        if (!confirm('Êtes-vous sûr de vouloir supprimer ce highlight ? Cette action est irréversible.')) {
+            return
+        }
+
+        setLoadingHighlights(true)
+        try {
+            const { error } = await supabase
+                .from('highlights')
+                .delete()
+                .eq('id', highlightId)
+                .eq('user_id', user.id)
+
+            if (error) throw error
+
+            setHighlights(prev => prev.filter(h => h.id !== highlightId))
+        } catch (error: any) {
+            console.error('Error deleting highlight:', error)
+            alert(`Failed to delete highlight: ${error.message || 'Unknown error'}`)
+        } finally {
+            setLoadingHighlights(false)
+        }
+    }
+
+    const handleDeleteStoryFromHighlight = async (highlightId: string, storyId: string) => {
+        if (!user) return
+
+        const highlight = highlights.find(h => h.id === highlightId)
+        if (!highlight) return
+
+        const updatedStories = highlight.stories.filter(s => s.id !== storyId)
+        
+        // If no stories left, delete the highlight
+        if (updatedStories.length === 0) {
+            handleDeleteHighlight(highlightId)
+            return
+        }
+
+        setLoadingHighlights(true)
+        try {
+            // Update cover_image if we're removing the first story
+            const newCoverImage = updatedStories.length > 0 
+                ? (highlight.cover_image === highlight.stories[0]?.image ? updatedStories[0].image : highlight.cover_image)
+                : null
+
+            const { error } = await supabase
+                .from('highlights')
+                .update({ 
+                    stories: updatedStories,
+                    cover_image: newCoverImage || updatedStories[0]?.image || null
+                })
+                .eq('id', highlightId)
+                .eq('user_id', user.id)
+
+            if (error) throw error
+
+            setHighlights(prev => prev.map(h => 
+                h.id === highlightId 
+                    ? { 
+                        ...h, 
+                        stories: updatedStories,
+                        cover_image: newCoverImage || updatedStories[0]?.image || null
+                    }
+                    : h
+            ))
+        } catch (error: any) {
+            console.error('Error deleting story from highlight:', error)
+            alert(`Failed to delete story: ${error.message || 'Unknown error'}`)
+        } finally {
+            setLoadingHighlights(false)
         }
     }
 
@@ -492,9 +567,22 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                                     >
                                                         {highlight.title}
                                                     </h3>
-                                                    <span className="text-xs text-muted-foreground flex-shrink-0">
-                                                        {highlight.stories.length} {highlight.stories.length === 1 ? 'story' : 'stories'}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                                                            {highlight.stories.length} {highlight.stories.length === 1 ? 'story' : 'stories'}
+                                                        </span>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteHighlight(highlight.id)}
+                                                            disabled={loadingHighlights}
+                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            title="Supprimer le highlight"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
                                                 </>
                                             )}
                                         </div>
@@ -564,6 +652,42 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* Stories list */}
+                                        {highlight.stories.length > 0 && (
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-medium text-muted-foreground">Stories dans ce highlight:</p>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {highlight.stories.map((story) => (
+                                                        <div key={story.id} className="relative group">
+                                                            {story.media_type === 'video' ? (
+                                                                <video 
+                                                                    src={story.media_url || story.image} 
+                                                                    className="w-full aspect-[9/16] rounded-lg object-cover"
+                                                                    muted
+                                                                    playsInline
+                                                                />
+                                                            ) : (
+                                                                <img 
+                                                                    src={story.image || story.media_url} 
+                                                                    alt="Story" 
+                                                                    className="w-full aspect-[9/16] rounded-lg object-cover"
+                                                                />
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteStoryFromHighlight(highlight.id, story.id)}
+                                                                disabled={loadingHighlights}
+                                                                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/80"
+                                                                title="Supprimer cette story"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             )}

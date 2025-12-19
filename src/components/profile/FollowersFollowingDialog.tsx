@@ -50,64 +50,94 @@ export function FollowersFollowingDialog({
             setItems([])
         }
     }, [isOpen, userId, type])
+    
+    // Add fetchItems to dependency array warning fix
+    // eslint-disable-next-line react-hooks/exhaustive-deps
 
     const fetchItems = async () => {
         setLoading(true)
         try {
             let query
 
+            let followsData: any[]
+            let profileIds: string[]
+
             if (type === 'followers') {
                 // Get users who follow this user
-                query = supabase
+                const { data: follows, error: followsError } = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        follower_id,
-                        profiles:follower_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, follower_id')
                     .eq('following_id', userId)
                     .order('created_at', { ascending: false })
+
+                if (followsError) {
+                    console.error(`Error fetching ${type}:`, followsError)
+                    throw followsError
+                }
+
+                followsData = follows || []
+                profileIds = followsData.map(f => f.follower_id)
             } else {
                 // Get users that this user follows
-                query = supabase
+                const { data: follows, error: followsError } = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        following_id,
-                        profiles:following_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, following_id')
                     .eq('follower_id', userId)
                     .order('created_at', { ascending: false })
+
+                if (followsError) {
+                    console.error(`Error fetching ${type}:`, followsError)
+                    throw followsError
+                }
+
+                followsData = follows || []
+                profileIds = followsData.map(f => f.following_id)
             }
 
-            const { data, error } = await query
+            // Fetch profiles for these user IDs (only if there are IDs to fetch)
+            let profilesData: any[] = []
+            if (profileIds.length > 0) {
+                const { data, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, username, full_name, avatar_url, course, bio')
+                    .in('id', profileIds)
 
-            if (error) throw error
+                if (profilesError) {
+                    console.error(`Error fetching profiles for ${type}:`, profilesError)
+                    throw profilesError
+                }
 
-            const formattedItems: FollowItem[] = (data || []).map((item: any) => ({
-                id: item.id,
-                user: type === 'followers' ? item.profiles : item.profiles,
-                created_at: item.created_at,
-            }))
+                profilesData = data || []
+            }
+
+            if (profilesError) {
+                console.error(`Error fetching profiles for ${type}:`, profilesError)
+                throw profilesError
+            }
+
+            // Create a map of profile ID to profile data
+            const profilesMap = new Map(profilesData.map((p: any) => [p.id, p]))
+
+            // Format items by combining follows data with profiles
+            const formattedItems: FollowItem[] = followsData
+                .map((follow: any) => {
+                    const userIdToLookup = type === 'followers' ? follow.follower_id : follow.following_id
+                    const profile = profilesMap.get(userIdToLookup)
+
+                    if (!profile) {
+                        return null
+                    }
+
+                    return {
+                        id: follow.id,
+                        user: profile,
+                        created_at: follow.created_at,
+                    }
+                })
+                .filter((item): item is FollowItem => item !== null)
 
             // Check if current user follows each person (only for followers list)
-            if (type === 'followers' && user) {
+            if (type === 'followers' && user && formattedItems.length > 0) {
                 const userIds = formattedItems.map(item => item.user.id)
                 const { data: followData } = await supabase
                     .from('follows')

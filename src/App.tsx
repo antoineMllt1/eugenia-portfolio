@@ -137,10 +137,16 @@ const StudentPortfolio: React.FC = () => {
   const reelVideoRefs = useRef<Record<string, HTMLVideoElement>>({});
   const reelContainerRefs = useRef<Record<string, HTMLDivElement>>({});
   const viewingUserIdRef = useRef<string | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const isCallInProgressRef = useRef<boolean>(false); // Synchronous guard against concurrent calls
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [currentInterlocutor, setCurrentInterlocutor] = useState<StudentProfile | null>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [callType, setCallType] = useState<'video' | 'audio' | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [conversations, setConversations] = useState<Array<{
     id: string;
     user: StudentProfile;
@@ -1578,6 +1584,80 @@ const StudentPortfolio: React.FC = () => {
     }
   };
 
+  // Call functions
+  const startCall = async (type: 'video' | 'audio') => {
+    // Prevent concurrent execution using ref for synchronous check (avoids stale closure issues)
+    if (isCallInProgressRef.current) {
+      return;
+    }
+
+    if (!currentInterlocutor) return;
+
+    // Set flag immediately to prevent concurrent calls (synchronous operation)
+    isCallInProgressRef.current = true;
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        video: type === 'video' ? { facingMode: 'user' } : false,
+        audio: true,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Verify flag is still set (no other call succeeded while we were waiting)
+      if (!isCallInProgressRef.current) {
+        // Another call completed, stop this stream and return
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
+      // Media acquired successfully - reset the guard flag (it only prevents concurrent acquisition)
+      // The call state is now managed by isCallActive
+      isCallInProgressRef.current = false;
+
+      setLocalStream(stream);
+      setCallType(type);
+      setIsCallActive(true);
+
+      // Attach stream to local video element
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    } catch (error: any) {
+      // Reset flag on error to allow retry
+      isCallInProgressRef.current = false;
+      console.error('Error accessing media devices:', error);
+      alert(`Impossible d'accéder à ${type === 'video' ? 'la caméra' : 'le microphone'}. Veuillez vérifier les permissions.`);
+    }
+  };
+
+  const endCall = () => {
+    // Reset the call in progress flag
+    isCallInProgressRef.current = false;
+    
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      setLocalStream(null);
+    }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    setIsCallActive(false);
+    setCallType(null);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [localStream]);
+
   // Fetch highlights from Supabase
   const fetchHighlights = async () => {
     if (!user) return;
@@ -1802,86 +1882,91 @@ const StudentPortfolio: React.FC = () => {
       }
 
       // Fetch stories with proper error handling (independent of posts)
-      // Use separate queries since foreign key names may not match
-      let storiesData: any[] = [];
-      let storiesError: any = null;
-      
-      const { data: storiesOnly, error: storiesOnlyError } = await supabase
-        .from('stories')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Only fetch stories if user is authenticated
+      if (user) {
+        let storiesData: any[] = [];
+        let storiesError: any = null;
+        
+        const { data: storiesOnly, error: storiesOnlyError } = await supabase
+          .from('stories')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (storiesOnlyError) {
-        storiesError = storiesOnlyError;
-      } else if (storiesOnly && storiesOnly.length > 0) {
-        // Fetch profiles separately
-        const userIds = [...new Set(storiesOnly.map((s: any) => s.user_id))];
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, username, full_name, avatar_url')
-          .in('id', userIds);
-        
-        // Merge profiles with stories
-        storiesData = storiesOnly.map((story: any) => ({
-          ...story,
-          profiles: profilesData?.find((p: any) => p.id === story.user_id) || null
-        }));
-      }
-
-      if (storiesError) {
-        console.error('Error fetching stories:', storiesError);
-        console.error('Stories error details:', JSON.stringify(storiesError, null, 2));
-        setStories([]);
-      } else {
-        // Filter out expired stories (older than 24 hours)
-        const now = new Date();
-        const validStories = (storiesData || []).filter((story: any) => {
-          if (!story.expires_at) return true; // Keep stories without expiration date
-          const expiresAt = new Date(story.expires_at);
-          return expiresAt > now;
-        });
-        
-        // Map stories to include media_url and media_type for backward compatibility
-        const formattedStories = validStories.map((story: any) => {
-          const mediaUrl = story.media_url || story.image_url;
-          // Check for video extension before query parameters (Supabase URLs have ?token=... after extension)
-          const isVideo = story.media_type === 'video' || (mediaUrl && /\.(mp4|webm|ogg|mov)(\?|$)/i.test(mediaUrl));
-          return {
-            ...story,
-            media_url: mediaUrl,
-            media_type: story.media_type || (isVideo ? 'video' : 'image')
-          };
-        });
-        
-        setStories(formattedStories || []);
-        
-        // Delete expired stories from database in background
-        if (storiesData && storiesData.length > validStories.length) {
-          const expiredStoryIds = (storiesData as any[])
-            .filter((story: any) => {
-              if (!story.expires_at) return false;
-              const expiresAt = new Date(story.expires_at);
-              return expiresAt <= now;
-            })
-            .map((story: any) => story.id);
+        if (storiesOnlyError) {
+          storiesError = storiesOnlyError;
+        } else if (storiesOnly && storiesOnly.length > 0) {
+          // Fetch profiles separately
+          const userIds = [...new Set(storiesOnly.map((s: any) => s.user_id))];
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, full_name, avatar_url')
+            .in('id', userIds);
           
-          if (expiredStoryIds.length > 0) {
-            // Delete expired stories in background (don't wait for response)
-            (async () => {
-              try {
-                const { error } = await supabase
-                  .from('stories')
-                  .delete()
-                  .in('id', expiredStoryIds);
-                if (error) {
-                  console.error('Error deleting expired stories:', error);
+          // Merge profiles with stories
+          storiesData = storiesOnly.map((story: any) => ({
+            ...story,
+            profiles: profilesData?.find((p: any) => p.id === story.user_id) || null
+          }));
+        }
+
+        if (storiesError) {
+          console.error('Error fetching stories:', storiesError);
+          console.error('Stories error details:', JSON.stringify(storiesError, null, 2));
+          setStories([]);
+        } else {
+          // Filter out expired stories (older than 24 hours)
+          const now = new Date();
+          const validStories = (storiesData || []).filter((story: any) => {
+            if (!story.expires_at) return true; // Keep stories without expiration date
+            const expiresAt = new Date(story.expires_at);
+            return expiresAt > now;
+          });
+          
+          // Map stories to include media_url and media_type for backward compatibility
+          const formattedStories = validStories.map((story: any) => {
+            const mediaUrl = story.media_url || story.image_url;
+            // Check for video extension before query parameters (Supabase URLs have ?token=... after extension)
+            const isVideo = story.media_type === 'video' || (mediaUrl && /\.(mp4|webm|ogg|mov)(\?|$)/i.test(mediaUrl));
+            return {
+              ...story,
+              media_url: mediaUrl,
+              media_type: story.media_type || (isVideo ? 'video' : 'image')
+            };
+          });
+          
+          setStories(formattedStories || []);
+          
+          // Delete expired stories from database in background
+          if (storiesData && storiesData.length > validStories.length) {
+            const expiredStoryIds = (storiesData as any[])
+              .filter((story: any) => {
+                if (!story.expires_at) return false;
+                const expiresAt = new Date(story.expires_at);
+                return expiresAt <= now;
+              })
+              .map((story: any) => story.id);
+            
+            if (expiredStoryIds.length > 0) {
+              // Delete expired stories in background (don't wait for response)
+              (async () => {
+                try {
+                  const { error } = await supabase
+                    .from('stories')
+                    .delete()
+                    .in('id', expiredStoryIds);
+                  if (error) {
+                    console.error('Error deleting expired stories:', error);
+                  }
+                } catch (error) {
+                  console.error('Error deleting expired stories (promise rejection):', error);
                 }
-    } catch (error) {
-                console.error('Error deleting expired stories (promise rejection):', error);
-              }
-            })();
+              })();
+            }
           }
         }
+      } else {
+        // User not authenticated, set empty stories
+        setStories([]);
       }
 
     } catch (error: any) {
@@ -2274,7 +2359,7 @@ const StudentPortfolio: React.FC = () => {
         }}
       />
       <Dialog open={isMessagesOpen} onOpenChange={setIsMessagesOpen}>
-        <DialogContent className="w-screen h-screen max-w-none sm:max-w-none p-0 overflow-hidden rounded-none bg-background">
+        <DialogContent className="w-screen h-screen max-w-none sm:max-w-none p-0 overflow-hidden rounded-none bg-background [&>button]:hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Messages</DialogTitle>
             <DialogDescription>Conversations et messages</DialogDescription>
@@ -2296,15 +2381,6 @@ const StudentPortfolio: React.FC = () => {
                     onClick={() => setIsNewConversationOpen(true)}
                   >
                     <SquarePlus className="w-5 h-5" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="rounded-full w-8 h-8 hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setIsMessagesOpen(false)}
-                    title="Fermer les messages"
-                  >
-                    <X className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
@@ -2441,16 +2517,20 @@ const StudentPortfolio: React.FC = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="rounded-full w-9 h-9"
+                        className="rounded-full w-9 h-9 transition-all duration-200 hover:bg-primary/10 hover:text-primary active:scale-95"
                         title="Appel vidéo"
+                        onClick={() => startCall('video')}
+                        disabled={!currentInterlocutor || isCallActive}
                       >
                         <VideoCall className="w-5 h-5" />
                       </Button>
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="rounded-full w-9 h-9"
-                        title="Appel"
+                        className="rounded-full w-9 h-9 transition-all duration-200 hover:bg-primary/10 hover:text-primary active:scale-95"
+                        title="Appel audio"
+                        onClick={() => startCall('audio')}
+                        disabled={!currentInterlocutor || isCallActive}
                       >
                         <Phone className="w-5 h-5" />
                       </Button>
@@ -2471,11 +2551,11 @@ const StudentPortfolio: React.FC = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="rounded-full w-9 h-9 hover:bg-destructive/10 hover:text-destructive"
+                        className="rounded-full w-9 h-9 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive active:scale-95"
                         title="Fermer les messages"
                         onClick={() => setIsMessagesOpen(false)}
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
@@ -2668,6 +2748,87 @@ const StudentPortfolio: React.FC = () => {
           }}
         />
       )}
+
+      {/* Call Dialog */}
+      <Dialog open={isCallActive} onOpenChange={(open) => !open && endCall()}>
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-background [&>button]:hidden">
+          <div className="relative w-full aspect-video bg-black rounded-t-lg overflow-hidden">
+            {/* Remote video (other person) - Full screen */}
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Local video (self) - Picture in picture */}
+            {callType === 'video' && (
+              <div className="absolute bottom-4 right-4 w-32 h-48 rounded-lg overflow-hidden border-2 border-white shadow-lg">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            {/* Audio only indicator */}
+            {callType === 'audio' && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+                    <Avatar className="w-20 h-20">
+                      <AvatarImage src={currentInterlocutor?.avatar_url} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                        {currentInterlocutor?.full_name?.[0] || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <p className="text-white font-semibold text-lg">{currentInterlocutor?.full_name || 'Utilisateur'}</p>
+                  <p className="text-white/70 text-sm">Appel audio en cours...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Call controls overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="rounded-full w-14 h-14"
+                  onClick={endCall}
+                  title="Raccrocher"
+                >
+                  <Phone className="w-6 h-6 rotate-[135deg]" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Call info header */}
+            <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={currentInterlocutor?.avatar_url} />
+                    <AvatarFallback className="bg-primary/20 text-primary">
+                      {currentInterlocutor?.full_name?.[0] || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-white font-semibold">{currentInterlocutor?.full_name || 'Utilisateur'}</p>
+                    <p className="text-white/70 text-xs">
+                      {callType === 'video' ? 'Appel vidéo' : 'Appel audio'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <CreateStoryDialog
         isOpen={isCreateStoryOpen}
         onClose={() => setIsCreateStoryOpen(false)}
@@ -2691,14 +2852,14 @@ const StudentPortfolio: React.FC = () => {
         {/* Scrolling Logo - Background - Full Width */}
         <div className="absolute inset-0 flex items-center pointer-events-none z-0 overflow-hidden">
           <div className="w-full h-full">
-            <div className="bg-[#8B1538] h-full flex items-center px-2 opacity-30">
+            <div className="header-bg-overlay h-full flex items-center px-2 opacity-30">
               <ScrollingLogo />
             </div>
           </div>
         </div>
         
         <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 header-logo-blur">
             {/* Theme Switcher */}
             <div className="relative z-50">
             <ThemeSwitcher />
@@ -2706,7 +2867,7 @@ const StudentPortfolio: React.FC = () => {
             
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-foreground tracking-tight">Eugeniagram</h1>
+              <h1 className="brand-title text-xl text-foreground">Eugeniagram</h1>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -2738,8 +2899,8 @@ const StudentPortfolio: React.FC = () => {
         </div>
       </header>
 
-      {/* Stories / Highlights Section - HOME ONLY */}
-      {activeTab === 'home' && (
+      {/* Stories / Highlights Section - HOME ONLY - AUTHENTICATED USERS ONLY */}
+      {activeTab === 'home' && user && (
         <div className="highlights-rail border-y border-border/50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center gap-2 mb-4">
@@ -3361,27 +3522,75 @@ const StudentPortfolio: React.FC = () => {
                 className="pl-12 h-12 rounded-full bg-muted border-0 focus:ring-2 focus:ring-primary/20"
               />
             </div>
-            <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className="aspect-square cursor-pointer relative group overflow-hidden"
-                  onClick={() => setSelectedPost(post)}
-                >
-                  <img
-                    src={post.images[0]}
-                    alt={post.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                    <div className="flex items-center gap-3 text-white text-sm">
-                      <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes_count}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {post.comments_count}</span>
+            {(() => {
+              // Combine filtered posts and reels, sorted by date (newest first)
+              const combinedResults = [
+                ...filteredPosts.map(p => ({ ...p, itemType: 'post' as const })),
+                ...filteredReels.map(r => ({ ...r, itemType: 'reel' as const }))
+              ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+              return (
+                <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
+                  {combinedResults.length === 0 ? (
+                    <div className="col-span-3 text-center py-12">
+                      <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
                     </div>
-                  </div>
+                  ) : (
+                    combinedResults.map((item) => (
+                      item.itemType === 'post' ? (
+                        <div
+                          key={`post-${item.id}`}
+                          className="aspect-square cursor-pointer relative group overflow-hidden"
+                          onClick={() => setSelectedPost(item)}
+                        >
+                          <img
+                            src={item.images[0]}
+                            alt={item.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                            <div className="flex items-center gap-3 text-white text-sm">
+                              <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count}</span>
+                              <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          key={`reel-${item.id}`}
+                          className="aspect-square cursor-pointer relative group overflow-hidden"
+                          onClick={() => {
+                            const reelItem: PostOrReel = {
+                              ...item,
+                              images: [item.video_url],
+                              tags: [],
+                            };
+                            setSelectedPost(reelItem);
+                          }}
+                        >
+                          <video
+                            src={item.video_url}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            muted
+                            playsInline
+                          />
+                          {/* Video indicator */}
+                          <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
+                            <Video className="w-3 h-3 text-white" />
+                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                            <div className="flex items-center gap-3 text-white text-sm">
+                              <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count || 0}</span>
+                              <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ))
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -3474,7 +3683,14 @@ const StudentPortfolio: React.FC = () => {
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold text-foreground">{userProfile?.full_name || user?.user_metadata?.full_name || 'Guest'}</h2>
                   <p className="text-sm text-muted-foreground">@{userProfile?.username || user?.user_metadata?.username || 'guest'}</p>
-                  <p className="text-sm mt-1 font-semibold text-primary">{userProfile?.course || 'Student'}</p>
+                  {userProfile?.course && (
+                    <div className="mt-2 inline-flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-primary" />
+                      <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-primary/20 bg-primary/10 text-primary hover:bg-primary/20">
+                        {userProfile.course}
+                      </span>
+                    </div>
+                  )}
                   {userProfile?.bio && <p className="text-sm mt-3 text-muted-foreground leading-relaxed">{userProfile.bio}</p>}
 
                   {/* Social Links */}
