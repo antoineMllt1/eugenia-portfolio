@@ -2887,7 +2887,21 @@ const StudentPortfolio: React.FC = () => {
                   <AvatarImage src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
                   <AvatarFallback className="bg-accent text-primary font-medium">{user.email?.[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <Button variant="ghost" size="icon" onClick={() => signOut()} className="rounded-full">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={async () => {
+                    try {
+                      await signOut();
+                    } catch (error) {
+                      console.error('Error signing out:', error);
+                      // Force refresh if signOut fails
+                      window.location.reload();
+                    }
+                  }} 
+                  className="rounded-full"
+                  title="Se déconnecter"
+                >
                   <LogOut className="h-5 w-5" />
                 </Button>
               </div>
