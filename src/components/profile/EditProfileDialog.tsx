@@ -28,6 +28,7 @@ interface UserProfile {
     course?: string
     github_url?: string
     linkedin_url?: string
+    role?: string
 }
 
 interface Highlight {
@@ -55,7 +56,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [githubUrl, setGithubUrl] = useState('')
     const [linkedinUrl, setLinkedinUrl] = useState('')
-    
+
     // Highlights state
     const [highlights, setHighlights] = useState<Highlight[]>([])
     const [loadingHighlights, setLoadingHighlights] = useState(false)
@@ -83,7 +84,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 setGithubUrl('')
                 setLinkedinUrl('')
             }
-            
+
             // Fetch highlights when dialog opens
             if (user) {
                 fetchHighlights()
@@ -93,7 +94,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
 
     const fetchHighlights = async () => {
         if (!user) return
-        
+
         setLoadingHighlights(true)
         try {
             const { data, error } = await supabase
@@ -161,7 +162,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             if (updateError) throw updateError
 
             // Update local state
-            setHighlights(prev => prev.map(h => 
+            setHighlights(prev => prev.map(h =>
                 h.id === highlightId ? { ...h, cover_image: publicUrl } : h
             ))
 
@@ -206,7 +207,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             if (updateError) throw updateError
 
             // Update local state
-            setHighlights(prev => prev.map(h => 
+            setHighlights(prev => prev.map(h =>
                 h.id === highlightId ? { ...h, title: highlightTitle.trim() } : h
             ))
 
@@ -377,11 +378,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                     <button
                         type="button"
                         onClick={() => setActiveTab('profile')}
-                        className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                            activeTab === 'profile'
+                        className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'profile'
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <div className="flex items-center justify-center gap-2">
                             <User className="w-4 h-4" />
@@ -391,11 +391,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                     <button
                         type="button"
                         onClick={() => setActiveTab('highlights')}
-                        className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                            activeTab === 'highlights'
+                        className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'highlights'
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <div className="flex items-center justify-center gap-2">
                             <Sparkles className="w-4 h-4" />
@@ -406,106 +405,106 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
 
                 {/* Scrollable Content */}
                 {activeTab === 'profile' ? (
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-                        <div className="flex flex-col items-center gap-4">
-                            <Avatar className="w-24 h-24">
-                                <AvatarImage src={previewUrl || ''} />
-                                <AvatarFallback>{fullName[0]}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                    id="avatar-upload"
-                                />
-                                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}>
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    Change Photo
-                                </Button>
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                            <div className="flex flex-col items-center gap-4">
+                                <Avatar className="w-24 h-24">
+                                    <AvatarImage src={previewUrl || ''} />
+                                    <AvatarFallback>{fullName[0]}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                        id="avatar-upload"
+                                    />
+                                    <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}>
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Change Photo
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Full Name</label>
-                            <Input
-                                value={fullName}
-                                onChange={(e) => setFullName(e.target.value)}
-                                placeholder="Your Name"
-                                required
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Class</label>
-                            <MultiSelectCombobox
-                                label="Class"
-                                options={CLASS_OPTIONS}
-                                value={selectedClass}
-                                onChange={(val) => setSelectedClass(val.slice(-1))}
-                                renderItem={(option) => option.label}
-                                renderSelectedItem={(val) => val[0]}
-                                placeholder="Select your class..."
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Bio</label>
-                            <Textarea
-                                value={bio}
-                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
-                                placeholder="Tell us about yourself..."
-                            />
-                        </div>
-
-                        {/* Social Links */}
-                        <div className="space-y-4 pt-4 border-t border-border pb-2">
-                            <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                                    🔗
-                                </span>
-                                Professional Links
-                            </p>
-                            
                             <div className="space-y-2">
-                                <label className="text-sm font-medium flex items-center gap-2">
-                                    <Github className="w-4 h-4" />
-                                    GitHub Profile
-                                </label>
+                                <label className="text-sm font-medium">Full Name</label>
                                 <Input
-                                    type="url"
-                                    value={githubUrl}
-                                    onChange={(e) => setGithubUrl(e.target.value)}
-                                    placeholder="https://github.com/username"
+                                    value={fullName}
+                                    onChange={(e) => setFullName(e.target.value)}
+                                    placeholder="Your Name"
+                                    required
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium flex items-center gap-2">
-                                    <Linkedin className="w-4 h-4" />
-                                    LinkedIn Profile
-                                </label>
-                                <Input
-                                    type="url"
-                                    value={linkedinUrl}
-                                    onChange={(e) => setLinkedinUrl(e.target.value)}
-                                    placeholder="https://linkedin.com/in/username"
+                                <label className="text-sm font-medium">Class</label>
+                                <MultiSelectCombobox
+                                    label="Class"
+                                    options={CLASS_OPTIONS}
+                                    value={selectedClass}
+                                    onChange={(val) => setSelectedClass(val.slice(-1))}
+                                    renderItem={(option) => option.label}
+                                    renderSelectedItem={(val) => val[0]}
+                                    placeholder="Select your class..."
                                 />
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Fixed Footer */}
-                    <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-card flex-shrink-0">
-                        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Changes
-                        </Button>
-                    </div>
-                </form>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Bio</label>
+                                <Textarea
+                                    value={bio}
+                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
+                                    placeholder="Tell us about yourself..."
+                                />
+                            </div>
+
+                            {/* Social Links */}
+                            <div className="space-y-4 pt-4 border-t border-border pb-2">
+                                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
+                                        🔗
+                                    </span>
+                                    Professional Links
+                                </p>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Github className="w-4 h-4" />
+                                        GitHub Profile
+                                    </label>
+                                    <Input
+                                        type="url"
+                                        value={githubUrl}
+                                        onChange={(e) => setGithubUrl(e.target.value)}
+                                        placeholder="https://github.com/username"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        <Linkedin className="w-4 h-4" />
+                                        LinkedIn Profile
+                                    </label>
+                                    <Input
+                                        type="url"
+                                        value={linkedinUrl}
+                                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                                        placeholder="https://linkedin.com/in/username"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Fixed Footer */}
+                        <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-card flex-shrink-0">
+                            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+                            <Button type="submit" disabled={loading}>
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Changes
+                            </Button>
+                        </div>
+                    </form>
                 ) : (
                     <div className="flex flex-col flex-1 overflow-hidden">
                         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -560,7 +559,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <h3 
+                                                    <h3
                                                         className="font-semibold text-foreground flex-1 cursor-pointer hover:text-primary transition-colors"
                                                         onClick={() => handleStartEditTitle(highlight.id, highlight.title)}
                                                         title="Cliquez pour modifier"
@@ -586,24 +585,24 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                                 </>
                                             )}
                                         </div>
-                                        
+
                                         <div className="flex items-center gap-4">
                                             <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
                                                 {editingHighlightId === highlight.id && highlightCoverPreview ? (
-                                                    <img 
-                                                        src={highlightCoverPreview} 
-                                                        alt="Preview" 
+                                                    <img
+                                                        src={highlightCoverPreview}
+                                                        alt="Preview"
                                                         className="w-full h-full object-cover"
                                                     />
                                                 ) : (
-                                                    <img 
-                                                        src={highlight.cover_image || highlight.stories[0]?.image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} 
-                                                        alt={highlight.title} 
+                                                    <img
+                                                        src={highlight.cover_image || highlight.stories[0]?.image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'}
+                                                        alt={highlight.title}
                                                         className="w-full h-full object-cover"
                                                     />
                                                 )}
                                             </div>
-                                            
+
                                             <div className="flex-1 space-y-2">
                                                 <Input
                                                     type="file"
@@ -692,7 +691,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                 ))
                             )}
                         </div>
-                        
+
                         {/* Fixed Footer */}
                         <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-card flex-shrink-0">
                             <Button type="button" variant="ghost" onClick={onClose}>Fermer</Button>
