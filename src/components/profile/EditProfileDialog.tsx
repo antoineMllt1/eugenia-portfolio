@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea' // We might need to create this or use Input
@@ -19,6 +21,14 @@ const CLASS_OPTIONS = [
     { value: 'B3 Eugenia', label: 'B3 Eugenia' },
 ]
 
+const LANGUAGE_OPTIONS = [
+    { value: 'fr', label: 'Français' },
+    { value: 'en', label: 'English' },
+    { value: 'es', label: 'Español' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'it', label: 'Italiano' },
+]
+
 interface UserProfile {
     id: string
     username: string
@@ -29,6 +39,7 @@ interface UserProfile {
     github_url?: string
     linkedin_url?: string
     role?: string
+    language?: string
 }
 
 interface Highlight {
@@ -47,11 +58,14 @@ interface EditProfileDialogProps {
 }
 
 export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpdate }: EditProfileDialogProps) {
+    const { t, i18n } = useTranslation()
+    const { changeLanguage } = useAuth()
     const [activeTab, setActiveTab] = useState<'profile' | 'highlights'>('profile')
     const [loading, setLoading] = useState(false)
     const [fullName, setFullName] = useState('')
     const [bio, setBio] = useState('')
     const [selectedClass, setSelectedClass] = useState<string[]>([])
+    const [selectedLanguage, setSelectedLanguage] = useState<string[]>([])
     const [avatarFile, setAvatarFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [githubUrl, setGithubUrl] = useState('')
@@ -75,6 +89,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 setPreviewUrl(profile.avatar_url)
                 setGithubUrl(profile.github_url || '')
                 setLinkedinUrl(profile.linkedin_url || '')
+                // Load language from profile or default to current i18n language
+                const profileLang = profile.language || i18n.language.split('-')[0]
+                const validLang = ['fr', 'en', 'es', 'de', 'it'].includes(profileLang) ? profileLang : 'fr'
+                setSelectedLanguage([validLang])
             } else if (user) {
                 // Fallback to auth metadata if no profile row exists
                 setFullName(user.user_metadata?.full_name || '')
@@ -83,6 +101,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 setSelectedClass([])
                 setGithubUrl('')
                 setLinkedinUrl('')
+                // Load language from user_metadata or default to current i18n language
+                const userLang = user.user_metadata?.language || i18n.language.split('-')[0]
+                const validLang = ['fr', 'en', 'es', 'de', 'it'].includes(userLang) ? userLang : 'fr'
+                setSelectedLanguage([validLang])
             }
 
             // Fetch highlights when dialog opens
@@ -90,7 +112,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 fetchHighlights()
             }
         }
-    }, [profile, user, isOpen])
+    }, [profile, user, isOpen, i18n.language])
 
     const fetchHighlights = async () => {
         if (!user) return
@@ -334,6 +356,9 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             }
 
             // 2. Update or Insert Profile
+            const selectedLang = selectedLanguage[0] || i18n.language.split('-')[0]
+            const validLang = ['fr', 'en', 'es', 'de', 'it'].includes(selectedLang) ? selectedLang : 'fr'
+            
             const profileData = {
                 id: user.id,
                 username: profile?.username || user.user_metadata?.username || user.email?.split('@')[0],
@@ -343,6 +368,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 avatar_url: avatarUrl,
                 github_url: githubUrl.trim() || null,
                 linkedin_url: linkedinUrl.trim() || null,
+                language: validLang,
                 updated_at: new Date().toISOString(),
             }
 
@@ -351,6 +377,9 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 .upsert(profileData)
 
             if (updateError) throw updateError
+
+            // Update language immediately
+            await changeLanguage(validLang)
 
             onProfileUpdate()
             onClose()
@@ -438,15 +467,38 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Class</label>
+                                <label className="text-sm font-medium">{t('auth.class')}</label>
                                 <MultiSelectCombobox
-                                    label="Class"
+                                    label={t('auth.class')}
                                     options={CLASS_OPTIONS}
                                     value={selectedClass}
                                     onChange={(val) => setSelectedClass(val.slice(-1))}
                                     renderItem={(option) => option.label}
                                     renderSelectedItem={(val) => val[0]}
-                                    placeholder="Select your class..."
+                                    placeholder={t('auth.classPlaceholder')}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('auth.language')}</label>
+                                <MultiSelectCombobox
+                                    label={t('auth.language')}
+                                    options={LANGUAGE_OPTIONS}
+                                    value={selectedLanguage}
+                                    onChange={(val) => {
+                                        const newLang = val.slice(-1)
+                                        setSelectedLanguage(newLang)
+                                        // Change language immediately when selected
+                                        if (newLang[0]) {
+                                            changeLanguage(newLang[0])
+                                        }
+                                    }}
+                                    renderItem={(option) => option.label}
+                                    renderSelectedItem={(val) => {
+                                        const option = LANGUAGE_OPTIONS.find(opt => opt.value === val[0])
+                                        return option?.label || val[0]
+                                    }}
+                                    placeholder={t('auth.languagePlaceholder')}
                                 />
                             </div>
 

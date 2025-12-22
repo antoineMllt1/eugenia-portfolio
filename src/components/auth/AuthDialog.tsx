@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -16,6 +18,14 @@ const CLASS_OPTIONS = [
     { value: 'B3 Eugenia', label: 'B3 Eugenia' },
 ]
 
+const LANGUAGE_OPTIONS = [
+    { value: 'fr', label: 'Français' },
+    { value: 'en', label: 'English' },
+    { value: 'es', label: 'Español' },
+    { value: 'de', label: 'Deutsch' },
+    { value: 'it', label: 'Italiano' },
+]
+
 interface AuthDialogProps {
     isOpen: boolean
     onClose: () => void
@@ -23,6 +33,8 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialogProps) {
+    const { t } = useTranslation()
+    const { changeLanguage } = useAuth()
     const [isLogin, setIsLogin] = useState(defaultTab === 'login')
     const [isForgotPassword, setIsForgotPassword] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -35,6 +47,12 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
     const [username, setUsername] = useState('')
     const [fullName, setFullName] = useState('')
     const [selectedClass, setSelectedClass] = useState<string[]>([])
+    const [selectedLanguage, setSelectedLanguage] = useState<string[]>(() => {
+        // Initialize with browser language or default to French
+        const browserLang = navigator.language.split('-')[0]
+        const defaultLang = ['fr', 'en', 'es', 'de', 'it'].includes(browserLang) ? browserLang : 'fr'
+        return [defaultLang]
+    })
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -46,7 +64,8 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
             if (isForgotPassword) {
                 // Validation de l'email
                 if (!email || !email.includes('@')) {
-                    setError('Veuillez entrer une adresse email valide.')
+                    setError(t('auth.emailInvalid'))
+                    setLoading(false)
                     return
                 }
                 
@@ -54,6 +73,9 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                 // Supabase utilise le hash fragment (#access_token=...) pour les SPA
                 // On utilise simplement l'origin - Supabase ajoutera automatiquement le hash avec le token
                 const redirectUrl = `${window.location.origin}${window.location.pathname}`
+                
+                console.log('Reset password - Envoi de la demande pour:', email)
+                console.log('Reset password - URL de redirection:', redirectUrl)
                 
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
                     redirectTo: redirectUrl,
@@ -69,20 +91,31 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                     
                     // Messages d'erreur clairs
                     if (error.message.includes('rate limit') || error.message.includes('too many')) {
-                        throw new Error('Trop de tentatives. Veuillez réessayer dans quelques minutes.')
-                    } else {
+                        setError(t('auth.tooManyResetAttempts'))
+                        setLoading(false)
+                        return
+                    } else if (error.message.includes('email') || error.message.includes('user')) {
+                        // Erreur liée à l'email ou l'utilisateur
                         // Ne pas révéler si l'email existe ou non (sécurité)
-                        // Toujours afficher le message de succès même si l'email n'existe pas
-                        // (pour éviter l'énumération d'emails)
+                        console.warn('Reset password - Erreur lors de l\'envoi:', error.message)
+                    } else {
+                        // Autre erreur - peut être liée à la configuration
+                        console.error('Reset password - Erreur inattendue:', error)
+                        setError(t('auth.resetEmailError'))
+                        setLoading(false)
+                        return
                     }
+                } else {
+                    console.log('Reset password - Demande envoyée avec succès')
                 }
                 
                 // Toujours afficher le message de succès (même si l'email n'existe pas)
                 // pour éviter l'énumération d'emails
-                setSuccessMessage('Si cette adresse email existe, un lien de réinitialisation a été envoyé. Vérifiez votre boîte de réception et vos spams.')
+                setSuccessMessage(t('auth.resetEmailSent'))
                 
                 // Réinitialiser le champ email
                 setEmail('')
+                setLoading(false)
                 
                 // Ne pas fermer automatiquement, laisser l'utilisateur lire le message
             } else if (isLogin) {
@@ -105,24 +138,25 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         error.message.includes('Email not confirmed') ||
                         error.message.includes('Invalid password') ||
                         error.message.includes('Wrong password')) {
-                        throw new Error('Email ou mot de passe incorrect')
+                        throw new Error(t('auth.emailOrPasswordIncorrect'))
                     } else if (error.message.includes('Too many requests')) {
-                        throw new Error('Trop de tentatives. Veuillez réessayer plus tard.')
+                        throw new Error(t('auth.tooManyAttempts'))
                     } else {
                         // Message générique pour les autres erreurs
-                        throw new Error('Erreur de connexion. Veuillez réessayer.')
+                        throw new Error(t('auth.connectionError'))
                     }
                 }
                 
                 // Vérifier que la session a bien été créée
                 if (!data.session) {
                     console.error('No session returned after login')
-                    throw new Error('Erreur de connexion. Veuillez réessayer.')
+                    throw new Error(t('auth.connectionError'))
                 }
                 
                 onClose()
             } else {
-                const { error } = await supabase.auth.signUp({
+                const selectedLang = selectedLanguage[0] || 'fr'
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
@@ -131,10 +165,17 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                             full_name: fullName,
                             avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
                             school: selectedClass[0] || '',
+                            language: selectedLang,
                         },
                     },
                 })
                 if (error) throw error
+                
+                // Save language to profiles table if user was created
+                if (data.user?.id) {
+                    await changeLanguage(selectedLang, data.user.id)
+                }
+                
                 onClose()
             }
         } catch (err: any) {
@@ -165,17 +206,17 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                 <DialogHeader>
                     <DialogTitle>
                         {isForgotPassword 
-                            ? 'Réinitialiser le mot de passe' 
+                            ? t('auth.resetPassword')
                             : isLogin 
-                            ? 'Welcome Back' 
-                            : 'Create Account'}
+                            ? t('auth.welcomeBack')
+                            : t('auth.createAccount')}
                     </DialogTitle>
                     <DialogDescription>
                         {isForgotPassword
-                            ? 'Entrez votre adresse email pour recevoir un lien de réinitialisation'
+                            ? t('auth.resetPasswordDescription')
                             : isLogin
-                            ? 'Enter your credentials to access your account'
-                            : 'Join the community to share your projects'}
+                            ? t('auth.loginDescription')
+                            : t('auth.signupDescription')}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -184,7 +225,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         <>
                             <div className="space-y-2">
                                 <Input
-                                    placeholder="Username"
+                                    placeholder={t('auth.usernamePlaceholder')}
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     required
@@ -192,7 +233,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                             </div>
                             <div className="space-y-2">
                                 <Input
-                                    placeholder="Full Name"
+                                    placeholder={t('auth.fullNamePlaceholder')}
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
                                     required
@@ -200,13 +241,34 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                             </div>
                             <div className="space-y-2">
                                 <MultiSelectCombobox
-                                    label="Class"
+                                    label={t('auth.class')}
                                     options={CLASS_OPTIONS}
                                     value={selectedClass}
                                     onChange={(val) => setSelectedClass(val.slice(-1))}
                                     renderItem={(option) => option.label}
                                     renderSelectedItem={(val) => val[0]}
-                                    placeholder="Select your class..."
+                                    placeholder={t('auth.classPlaceholder')}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <MultiSelectCombobox
+                                    label={t('auth.language')}
+                                    options={LANGUAGE_OPTIONS}
+                                    value={selectedLanguage}
+                                    onChange={(val) => {
+                                        const newLang = val.slice(-1)
+                                        setSelectedLanguage(newLang)
+                                        // Change language immediately when selected
+                                        if (newLang[0]) {
+                                            changeLanguage(newLang[0])
+                                        }
+                                    }}
+                                    renderItem={(option) => option.label}
+                                    renderSelectedItem={(val) => {
+                                        const option = LANGUAGE_OPTIONS.find(opt => opt.value === val[0])
+                                        return option?.label || val[0]
+                                    }}
+                                    placeholder={t('auth.languagePlaceholder')}
                                 />
                             </div>
                         </>
@@ -215,7 +277,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                     <div className="space-y-2">
                         <Input
                             type="email"
-                            placeholder="Email"
+                            placeholder={t('auth.emailPlaceholder')}
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
@@ -226,7 +288,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         <div className="space-y-2">
                             <Input
                                 type="password"
-                                placeholder="Password"
+                                placeholder={t('auth.passwordPlaceholder')}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required={!isForgotPassword}
@@ -250,10 +312,10 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isForgotPassword 
-                                ? 'Envoyer l\'email de réinitialisation' 
+                                ? t('auth.sendResetEmail')
                                 : isLogin 
-                                ? 'Sign In' 
-                                : 'Sign Up'}
+                                ? t('auth.signIn')
+                                : t('auth.signUp')}
                         </Button>
 
                         {isForgotPassword ? (
@@ -263,20 +325,20 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                                     className="text-primary hover:underline font-medium"
                                     onClick={handleBackToLogin}
                                 >
-                                    Retour à la connexion
+                                    {t('auth.backToLogin')}
                                 </button>
                             </div>
                         ) : (
                             <div className="text-center text-sm text-muted-foreground mt-2">
                                 {isLogin ? (
                                     <>
-                                        Don't have an account?{' '}
+                                        {t('auth.noAccount')}{' '}
                                         <button
                                             type="button"
                                             className="text-primary hover:underline font-medium"
                                             onClick={() => setIsLogin(!isLogin)}
                                         >
-                                            Sign Up
+                                            {t('auth.signUp')}
                                         </button>
                                         <br />
                                         <button
@@ -284,18 +346,18 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                                             className="text-primary hover:underline font-medium mt-1"
                                             onClick={handleForgotPasswordClick}
                                         >
-                                            Mot de passe oublié ?
+                                            {t('auth.forgotPassword')}
                                         </button>
                                     </>
                                 ) : (
                                     <>
-                                        Already have an account?{' '}
+                                        {t('auth.hasAccount')}{' '}
                                         <button
                                             type="button"
                                             className="text-primary hover:underline font-medium"
                                             onClick={() => setIsLogin(!isLogin)}
                                         >
-                                            Sign In
+                                            {t('auth.signIn')}
                                         </button>
                                     </>
                                 )}

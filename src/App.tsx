@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info, Shield } from 'lucide-react';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -120,6 +121,7 @@ interface GroupedUserStories {
 
 // Main Component
 const StudentPortfolio: React.FC = () => {
+  const { t } = useTranslation();
   const { user, signOut, loading: authLoading } = useAuth();
   const [posts, setPosts] = useState<ProjectPost[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
@@ -2364,7 +2366,7 @@ const StudentPortfolio: React.FC = () => {
       <Dialog open={isMessagesOpen} onOpenChange={setIsMessagesOpen}>
         <DialogContent className="w-screen h-screen max-w-none sm:max-w-none p-0 overflow-hidden rounded-none bg-background [&>button]:hidden">
           <DialogHeader className="sr-only">
-            <DialogTitle>Messages</DialogTitle>
+            <DialogTitle>{t('messages.title')}</DialogTitle>
             <DialogDescription>Conversations et messages</DialogDescription>
           </DialogHeader>
           <div className="flex h-screen">
@@ -2374,7 +2376,7 @@ const StudentPortfolio: React.FC = () => {
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                 <div>
                   <p className="font-bold text-foreground text-base">{userProfile?.username || user?.email?.split('@')[0] || 'Vous'}</p>
-                  <p className="text-xs text-muted-foreground">Messages</p>
+                  <p className="text-xs text-muted-foreground">{t('messages.title')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -2384,6 +2386,15 @@ const StudentPortfolio: React.FC = () => {
                     onClick={() => setIsNewConversationOpen(true)}
                   >
                     <SquarePlus className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full w-8 h-8 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setIsMessagesOpen(false)}
+                    title={t('messages.close')}
+                  >
+                    <X className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
@@ -2554,7 +2565,7 @@ const StudentPortfolio: React.FC = () => {
                         variant="ghost"
                         size="icon"
                         className="rounded-full w-9 h-9 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive active:scale-95"
-                        title="Fermer les messages"
+                        title={t('messages.close')}
                         onClick={() => setIsMessagesOpen(false)}
                       >
                         <X className="w-4 h-4" />
@@ -2655,16 +2666,26 @@ const StudentPortfolio: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                <div className="flex flex-col items-center justify-center h-full text-center px-6 relative">
+                  {/* Bouton fermer en haut à droite */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-4 right-4 rounded-full w-8 h-8 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setIsMessagesOpen(false)}
+                    title={t('messages.close')}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <Send className="w-10 h-10 text-primary" />
                   </div>
-                  <h3 className="font-bold text-xl text-foreground mb-2">Vos messages</h3>
+                  <h3 className="font-bold text-xl text-foreground mb-2">{t('messages.yourMessages')}</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Envoyez des photos et des messages privés à un ami ou à un groupe.
+                    {t('messages.messageDescription')}
                   </p>
                   <Button className="mt-6 rounded-full bg-primary hover:bg-primary/90" onClick={() => setIsNewConversationOpen(true)}>
-                    Envoyer un message
+                    {t('messages.sendMessage')}
                   </Button>
                 </div>
               )}
@@ -2907,7 +2928,7 @@ const StudentPortfolio: React.FC = () => {
               </div>
             ) : (
               <Button onClick={() => setAuthOpen(true)} variant="brand" size="sm">
-                <LogIn className="mr-2 h-4 w-4" /> Sign In
+                <LogIn className="mr-2 h-4 w-4" /> {t('auth.signIn')}
               </Button>
             )}
           </div>
@@ -3620,7 +3641,7 @@ const StudentPortfolio: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
                 <p className="text-muted-foreground text-sm mb-4">You need to sign in to create a project.</p>
-                <Button variant="brand" onClick={() => setAuthOpen(true)}>Sign In</Button>
+                <Button variant="brand" onClick={() => setAuthOpen(true)}>{t('auth.signIn')}</Button>
               </Card>
             ) : (
               <Card className="p-6">
@@ -4156,11 +4177,11 @@ const StudentPortfolio: React.FC = () => {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <MenuBar
           items={[
-            { icon: Home, label: 'Home', href: '#' },
-            { icon: Search, label: 'Search', href: '#' },
-            { icon: Clapperboard, label: 'Reels', href: '#' },
-            { icon: SquarePlus, label: 'Create', href: '#' },
-            { icon: UserIcon, label: 'Profile', href: '#' },
+            { icon: Home, label: t('navigation.home'), href: '#' },
+            { icon: Search, label: t('navigation.search'), href: '#' },
+            { icon: Clapperboard, label: t('navigation.reels'), href: '#' },
+            { icon: SquarePlus, label: t('navigation.create'), href: '#' },
+            { icon: UserIcon, label: t('navigation.profile'), href: '#' },
           ]}
           activeItem={activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
           onItemClick={(item) => {
