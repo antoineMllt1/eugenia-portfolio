@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -50,8 +51,8 @@ serve(async (req) => {
 
         if (profilesError) throw profilesError
 
-        const usersList = users.users.map(u => {
-            const p = profiles.find(profile => profile.id === u.id)
+        const usersList = users.users.map((u: any) => {
+            const p = profiles.find((profile: any) => profile.id === u.id)
             return {
                 id: u.id,
                 email: u.email,
@@ -67,7 +68,7 @@ serve(async (req) => {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
-    } catch (error) {
+    } catch (error: any) {
         return new Response(JSON.stringify({ error: error.message }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -2654,8 +2654,8 @@ const StudentPortfolio: React.FC = () => {
                     </button>
                   ))}
                 {availableUsers.filter(u =>
-                  u.username.toLowerCase().includes(newConversationSearch.toLowerCase()) ||
-                  u.full_name.toLowerCase().includes(newConversationSearch.toLowerCase())
+                  (u.username || '').toLowerCase().includes(newConversationSearch.toLowerCase()) ||
+                  (u.full_name || '').toLowerCase().includes(newConversationSearch.toLowerCase())
                 ).length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="text-sm">Aucun utilisateur trouvé</p>
@@ -3263,15 +3263,15 @@ const StudentPortfolio: React.FC = () => {
                                 className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
                                 onClick={() => setViewingUserId(item.user_id)}
                               >
-                                <AvatarImage src={item.profiles.avatar_url} />
-                                <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
+                                <AvatarImage src={item.profiles.avatar_url || undefined} />
+                                <AvatarFallback className="bg-accent text-primary font-medium">{(item.profiles.full_name || 'U')[0]}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <p
                                   className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                                   onClick={() => setViewingUserId(item.user_id)}
                                 >
-                                  {item.profiles.full_name}
+                                  {item.profiles.full_name || 'Utilisateur'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                               </div>
