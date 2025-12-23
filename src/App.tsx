@@ -12,6 +12,19 @@ import { useAuth } from '@/context/AuthContext';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { ResetPasswordDialog } from '@/components/auth/ResetPasswordDialog';
 import { supabase } from '@/lib/supabase';
+import type {
+  StudentProfile,
+  ProjectPost,
+  Reel,
+  Comment,
+  StoryItem,
+  HighlightStory,
+  Highlight,
+  GroupedUserStories,
+  Message,
+  SavedPostItem,
+  PostOrReel
+} from '@/types';
 import { EditProfileDialog } from './components/profile/EditProfileDialog';
 import { PublicProfileDialog } from './components/profile/PublicProfileDialog';
 import { FollowersFollowingDialog } from './components/profile/FollowersFollowingDialog';
@@ -21,103 +34,7 @@ import { MenuBar } from '@/components/ui/glow-menu';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { ScrollingLogo } from '@/components/ui/scrolling-logo';
 
-// Types
-interface StudentProfile {
-  id: string;
-  full_name: string;
-  username: string;
-  avatar_url: string;
-  bio?: string;
-  course?: string;
-  github_url?: string;
-  linkedin_url?: string;
-  role?: string;
-  is_admin?: boolean;
-}
 
-interface ProjectPost {
-  id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  images: string[];
-  video_url?: string;
-  post_type?: 'post' | 'reel';
-  tags: string[];
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  liked_by_user?: boolean;
-  saved_by_user?: boolean;
-}
-
-interface Reel {
-  id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  video_url: string;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  liked_by_user?: boolean;
-  saved_by_user?: boolean;
-}
-
-type SavedPostItem = (ProjectPost & { type: 'post' }) | (Reel & { type: 'reel'; images: string[] });
-
-type PostOrReel = ProjectPost | (Reel & { images: string[]; tags?: string[] });
-
-interface Comment {
-  id: string;
-  post_id: string;
-  user_id: string;
-  text: string;
-  created_at: string;
-  profiles: StudentProfile;
-}
-
-interface StoryItem {
-  id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  image_url: string;
-  media_url?: string; // New field for both images and videos
-  media_type?: 'image' | 'video'; // New field to distinguish media type
-  progress?: number;
-  achievement?: string;
-  created_at: string;
-}
-
-interface HighlightStory {
-  id: string;
-  image: string;
-  media_url?: string; // New field for videos
-  media_type?: 'image' | 'video'; // New field to distinguish media type
-  description: string;
-}
-
-interface Highlight {
-  id: string;
-  user_id: string;
-  title: string;
-  cover_image: string | null;
-  stories: HighlightStory[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-// Grouped stories by user
-interface GroupedUserStories {
-  user_id: string;
-  profile: StudentProfile;
-  stories: StoryItem[];
-  hasMultiple: boolean;
-}
 
 // Main Component
 const StudentPortfolio: React.FC = () => {
@@ -159,13 +76,7 @@ const StudentPortfolio: React.FC = () => {
     timestamp: string;
     conversation_id: string;
   }>>([]);
-  const [messages, setMessages] = useState<Array<{
-    id: string;
-    content: string;
-    sender_id: string;
-    created_at: string;
-    sender: StudentProfile;
-  }>>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessageText, setNewMessageText] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -252,7 +163,7 @@ const StudentPortfolio: React.FC = () => {
         user_id: data.user_id,
         title: data.title,
         cover_image: data.cover_image,
-        stories: Array.isArray(data.stories) ? data.stories : [],
+        stories: Array.isArray(data.stories) ? (data.stories as any as HighlightStory[]) : [],
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
@@ -339,7 +250,7 @@ const StudentPortfolio: React.FC = () => {
   };
 
   // Open highlight viewer
-  const openHighlightViewer = (highlight: typeof profileHighlights[0]) => {
+  const openHighlightViewer = (highlight: Highlight) => {
     setViewingHighlight(highlight);
     setHighlightStoryIndex(0);
   };
@@ -349,6 +260,7 @@ const StudentPortfolio: React.FC = () => {
     if (viewingHighlight && highlightStoryIndex < viewingHighlight.stories.length - 1) {
       setHighlightStoryIndex(prev => prev + 1);
     } else {
+      // Close viewer when at last story
       setViewingHighlight(null);
       setHighlightStoryIndex(0);
     }
@@ -468,7 +380,7 @@ const StudentPortfolio: React.FC = () => {
   // Détecter le token de reset password dans l'URL (hash fragment)
   // Supabase gère automatiquement les tokens dans le hash et émet un événement PASSWORD_RECOVERY
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: any = null;
 
     // Vérifier l'URL au chargement initial avec un délai pour laisser Supabase traiter le hash
     const checkResetToken = () => {
@@ -592,14 +504,14 @@ const StudentPortfolio: React.FC = () => {
 
     // Prevent multiple simultaneous calls for the same conversation
     if (fetchingInterlocutorRef.current === conversationId) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('fetchInterlocutorInfo already in progress for conversation:', conversationId);
       }
       return;
     }
 
     // Only log in development to reduce console noise
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.debug('fetchInterlocutorInfo called for conversation:', conversationId);
     }
 
@@ -609,7 +521,7 @@ const StudentPortfolio: React.FC = () => {
     // Use ref to avoid dependency on conversations array
     const conv = conversationsRef.current.find(c => c.id === conversationId || c.conversation_id === conversationId);
     if (conv && conv.user && conv.user.id !== user.id) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.log('Using interlocutor from conversations list:', conv.user);
       }
       setCurrentInterlocutor(conv.user);
@@ -639,14 +551,14 @@ const StudentPortfolio: React.FC = () => {
       if (!otherUserId) {
         // Try to use conversation list data if available
         if (conv && conv.user && conv.user.id !== user.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.log('Using interlocutor from conversations list as fallback:', conv.user);
           }
           setCurrentInterlocutor(conv.user);
           return;
         }
 
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.warn('Could not find interlocutor for conversation:', conversationId);
         }
         return;
@@ -679,11 +591,11 @@ const StudentPortfolio: React.FC = () => {
         };
         // Only update if it's different to avoid unnecessary re-renders
         if (!currentInterlocutor || currentInterlocutor.id !== interlocutorData.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.debug('Setting currentInterlocutor:', interlocutorData);
           }
           setCurrentInterlocutor(interlocutorData);
-        } else if (process.env.NODE_ENV === 'development') {
+        } else if (import.meta.env.DEV) {
           console.debug('currentInterlocutor already set, skipping update');
         }
       } else {
@@ -707,7 +619,7 @@ const StudentPortfolio: React.FC = () => {
   // Fetch messages when a conversation is selected
   useEffect(() => {
     if (selectedConversation && user) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Conversation selected:', selectedConversation);
       }
       setMessages([]); // Clear previous messages
@@ -718,7 +630,7 @@ const StudentPortfolio: React.FC = () => {
       if (conv && conv.user && conv.user.id !== user.id) {
         // Only update if it's different to avoid unnecessary re-renders
         if (!currentInterlocutor || currentInterlocutor.id !== conv.user.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.debug('Using interlocutor from conversations list:', conv.user);
           }
           setCurrentInterlocutor(conv.user);
@@ -782,7 +694,7 @@ const StudentPortfolio: React.FC = () => {
 
     // Prevent multiple simultaneous calls
     if (fetchingConversationsRef.current) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('fetchConversations already in progress, skipping...');
       }
       return;
@@ -801,7 +713,7 @@ const StudentPortfolio: React.FC = () => {
         throw rpcError;
       }
 
-      if (!conversationsData || conversationsData.length === 0) {
+      if (!conversationsData || !Array.isArray(conversationsData) || conversationsData.length === 0) {
         setConversations([]);
         conversationsRef.current = [];
         return;
@@ -855,7 +767,7 @@ const StudentPortfolio: React.FC = () => {
 
       setConversations(formattedConversations);
       conversationsRef.current = formattedConversations; // Update ref
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Conversations chargées:', formattedConversations.length);
       }
     } catch (error: any) {
@@ -1136,7 +1048,7 @@ const StudentPortfolio: React.FC = () => {
         // Continue to create new conversation if check fails
       } else if (existingConversationId) {
         // Conversation already exists, use it
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.debug('Found existing conversation:', existingConversationId);
         }
         setSelectedConversation(existingConversationId);
@@ -1227,7 +1139,7 @@ const StudentPortfolio: React.FC = () => {
       });
 
       if (verifyError) {
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.error('Error verifying other participant:', verifyError);
         }
       } else if (!otherUserIdFromRPC) {
@@ -1236,7 +1148,7 @@ const StudentPortfolio: React.FC = () => {
           conversation_id_param: conversationId,
           user_id_param: targetUserId
         });
-        if (addP2Error && process.env.NODE_ENV === 'development') {
+        if (addP2Error && import.meta.env.DEV) {
           console.error('Error adding other participant via RPC:', addP2Error);
         }
 
@@ -1290,12 +1202,12 @@ const StudentPortfolio: React.FC = () => {
       });
 
       // Silently handle notification errors - they're not critical for the conversation to work
-      if (error && process.env.NODE_ENV === 'development') {
+      if (error && import.meta.env.DEV) {
         console.debug('Notification email error (non-critical):', error);
       }
     } catch (error: any) {
       // Silently handle notification errors - they're not critical for the conversation to work
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Notification email error (non-critical):', error);
       }
     }
@@ -2431,7 +2343,7 @@ const StudentPortfolio: React.FC = () => {
                         <button
                           key={conv.conversation_id || conv.id}
                           onClick={() => {
-                            if (process.env.NODE_ENV === 'development') {
+                            if (import.meta.env.DEV) {
                               console.debug('Conversation clicked:', conv.id, 'User:', conv.user);
                             }
                             // Set interlocutor immediately from the conversation
@@ -2624,7 +2536,7 @@ const StudentPortfolio: React.FC = () => {
                               >
                                 <p className="text-sm leading-relaxed">{msg.content}</p>
                                 <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
-                                  {formatMessageTime(new Date(msg.created_at))}
+                                  {formatMessageTime(new Date(msg.created_at || ""))}
                                 </p>
                               </div>
                             </div>

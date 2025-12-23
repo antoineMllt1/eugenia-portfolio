@@ -29,25 +29,7 @@ const LANGUAGE_OPTIONS = [
     { value: 'it', label: 'Italiano' },
 ]
 
-interface UserProfile {
-    id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    bio?: string
-    course?: string
-    github_url?: string
-    linkedin_url?: string
-    role?: string
-    language?: string
-}
-
-interface Highlight {
-    id: string
-    title: string
-    cover_image: string | null
-    stories: Array<{ id: string; image: string; media_url?: string; media_type?: 'image' | 'video' }>
-}
+import type { UserProfile, Highlight } from '@/types'
 
 interface EditProfileDialogProps {
     isOpen: boolean
@@ -132,9 +114,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
 
             setHighlights((data || []).map((h: any) => ({
                 id: h.id,
+                user_id: h.user_id,
                 title: h.title,
                 cover_image: h.cover_image,
-                stories: Array.isArray(h.stories) ? h.stories : [],
+                stories: Array.isArray(h.stories) ? (h.stories as any) : [],
             })))
         } catch (error) {
             console.error('Error fetching highlights:', error)
@@ -248,7 +231,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
 
     const handleDeleteHighlight = async (highlightId: string) => {
         if (!user) return
-        
+
         if (!confirm('Êtes-vous sûr de vouloir supprimer ce highlight ? Cette action est irréversible.')) {
             return
         }
@@ -279,7 +262,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
         if (!highlight) return
 
         const updatedStories = highlight.stories.filter(s => s.id !== storyId)
-        
+
         // If no stories left, delete the highlight
         if (updatedStories.length === 0) {
             handleDeleteHighlight(highlightId)
@@ -289,14 +272,14 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
         setLoadingHighlights(true)
         try {
             // Update cover_image if we're removing the first story
-            const newCoverImage = updatedStories.length > 0 
+            const newCoverImage = updatedStories.length > 0
                 ? (highlight.cover_image === highlight.stories[0]?.image ? updatedStories[0].image : highlight.cover_image)
                 : null
 
             const { error } = await supabase
                 .from('highlights')
-                .update({ 
-                    stories: updatedStories,
+                .update({
+                    stories: updatedStories as any,
                     cover_image: newCoverImage || updatedStories[0]?.image || null
                 })
                 .eq('id', highlightId)
@@ -304,10 +287,10 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
 
             if (error) throw error
 
-            setHighlights(prev => prev.map(h => 
-                h.id === highlightId 
-                    ? { 
-                        ...h, 
+            setHighlights(prev => prev.map(h =>
+                h.id === highlightId
+                    ? {
+                        ...h,
                         stories: updatedStories,
                         cover_image: newCoverImage || updatedStories[0]?.image || null
                     }
@@ -358,7 +341,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             // 2. Update or Insert Profile
             const selectedLang = selectedLanguage[0] || i18n.language.split('-')[0]
             const validLang = ['fr', 'en', 'es', 'de', 'it'].includes(selectedLang) ? selectedLang : 'fr'
-            
+
             const profileData = {
                 id: user.id,
                 username: profile?.username || user.user_metadata?.username || user.email?.split('@')[0],
@@ -408,8 +391,8 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                         type="button"
                         onClick={() => setActiveTab('profile')}
                         className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'profile'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -421,8 +404,8 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                         type="button"
                         onClick={() => setActiveTab('highlights')}
                         className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'highlights'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -712,16 +695,16 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                                     {highlight.stories.map((story) => (
                                                         <div key={story.id} className="relative group">
                                                             {story.media_type === 'video' ? (
-                                                                <video 
-                                                                    src={story.media_url || story.image} 
+                                                                <video
+                                                                    src={story.media_url || story.image}
                                                                     className="w-full aspect-[9/16] rounded-lg object-cover"
                                                                     muted
                                                                     playsInline
                                                                 />
                                                             ) : (
-                                                                <img 
-                                                                    src={story.image || story.media_url} 
-                                                                    alt="Story" 
+                                                                <img
+                                                                    src={story.image || story.media_url}
+                                                                    alt="Story"
                                                                     className="w-full aspect-[9/16] rounded-lg object-cover"
                                                                 />
                                                             )}
