@@ -215,7 +215,7 @@ const StudentPortfolio: React.FC = () => {
       const { error } = await supabase
         .from('highlights')
         .update({
-          stories: updatedStories,
+          stories: updatedStories as any,
           // Update cover_image if this is the first story
           cover_image: currentHighlight.cover_image || newStoryObj.image,
         })
@@ -754,8 +754,8 @@ const StudentPortfolio: React.FC = () => {
       formattedConversations.sort((a, b) => {
         const aConv = conversationsData.find((c: any) => c.conversation_id === a.id);
         const bConv = conversationsData.find((c: any) => c.conversation_id === b.id);
-        const aUpdated = aConv?.conversation_updated_at;
-        const bUpdated = bConv?.conversation_updated_at;
+        const aUpdated = (aConv as any)?.conversation_updated_at;
+        const bUpdated = (bConv as any)?.conversation_updated_at;
 
         // Handle null/undefined updated_at
         if (!aUpdated && !bUpdated) return 0;
@@ -2194,8 +2194,6 @@ const StudentPortfolio: React.FC = () => {
     .sort((a, b) => b.interactionScore - a.interactionScore)
     .slice(0, 10); // Top 10 most interactive posts
 
-  // Keep feedItems for backward compatibility (used in other places)
-  const feedItems = feedItemsAll;
 
   // Early return with loading state if auth is still loading
   if (authLoading) {
@@ -2336,8 +2334,8 @@ const StudentPortfolio: React.FC = () => {
                   <div>
                     {conversations
                       .filter(c =>
-                        c.user.username.toLowerCase().includes(messageSearch.toLowerCase()) ||
-                        c.user.full_name.toLowerCase().includes(messageSearch.toLowerCase())
+                        (c.user.username || '').toLowerCase().includes(messageSearch.toLowerCase()) ||
+                        (c.user.full_name || '').toLowerCase().includes(messageSearch.toLowerCase())
                       )
                       .map((conv) => (
                         <button
@@ -2357,8 +2355,8 @@ const StudentPortfolio: React.FC = () => {
                             }`}
                         >
                           <Avatar className="w-12 h-12 flex-shrink-0">
-                            <AvatarImage src={conv.user.avatar_url} />
-                            <AvatarFallback className="bg-primary/20 text-primary">{conv.user.full_name[0]}</AvatarFallback>
+                            <AvatarImage src={conv.user.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/20 text-primary">{(conv.user.full_name || 'U')[0]}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
@@ -2406,9 +2404,9 @@ const StudentPortfolio: React.FC = () => {
                               setIsMessagesOpen(false);
                             }}
                           >
-                            <AvatarImage src={currentInterlocutor.avatar_url} />
-                            <AvatarFallback className="bg-primary/20 text-primary">
-                              {currentInterlocutor.full_name?.[0] || '?'}
+                            <AvatarImage src={currentInterlocutor.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {(currentInterlocutor.full_name || 'U')[0]}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
@@ -2496,9 +2494,9 @@ const StudentPortfolio: React.FC = () => {
                         {currentInterlocutor ? (
                           <>
                             <Avatar className="w-16 h-16 mb-4">
-                              <AvatarImage src={currentInterlocutor.avatar_url} />
+                              <AvatarImage src={currentInterlocutor.avatar_url || undefined} />
                               <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                                {currentInterlocutor.full_name[0]}
+                                {(currentInterlocutor.full_name || 'U')[0]}
                               </AvatarFallback>
                             </Avatar>
                             <p className="font-semibold text-base text-foreground">
@@ -2631,8 +2629,8 @@ const StudentPortfolio: React.FC = () => {
               <div className="space-y-2">
                 {availableUsers
                   .filter(u =>
-                    u.username.toLowerCase().includes(newConversationSearch.toLowerCase()) ||
-                    u.full_name.toLowerCase().includes(newConversationSearch.toLowerCase())
+                    (u.username || '').toLowerCase().includes(newConversationSearch.toLowerCase()) ||
+                    (u.full_name || '').toLowerCase().includes(newConversationSearch.toLowerCase())
                   )
                   .map((userProfile) => (
                     <button
@@ -2641,14 +2639,14 @@ const StudentPortfolio: React.FC = () => {
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
                     >
                       <Avatar className="w-10 h-10">
-                        <AvatarImage src={userProfile.avatar_url} />
+                        <AvatarImage src={userProfile.avatar_url || undefined} />
                         <AvatarFallback className="bg-accent text-primary">
-                          {userProfile.full_name[0]}
+                          {(userProfile.full_name || 'U')[0]}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{userProfile.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">@{userProfile.username}</p>
+                        <p className="font-semibold text-sm truncate">{userProfile.full_name || 'Utilisateur'}</p>
+                        <p className="text-xs text-muted-foreground truncate">@{userProfile.username || 'username'}</p>
                         {userProfile.course && (
                           <p className="text-xs text-muted-foreground">{userProfile.course}</p>
                         )}
@@ -2714,9 +2712,9 @@ const StudentPortfolio: React.FC = () => {
                 <div className="text-center">
                   <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
                     <Avatar className="w-20 h-20">
-                      <AvatarImage src={currentInterlocutor?.avatar_url} />
+                      <AvatarImage src={currentInterlocutor?.avatar_url || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                        {currentInterlocutor?.full_name?.[0] || '?'}
+                        {(currentInterlocutor?.full_name || 'U')[0]}
                       </AvatarFallback>
                     </Avatar>
                   </div>
@@ -2746,9 +2744,9 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src={currentInterlocutor?.avatar_url} />
+                    <AvatarImage src={currentInterlocutor?.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary/20 text-primary">
-                      {currentInterlocutor?.full_name?.[0] || '?'}
+                      {(currentInterlocutor?.full_name || 'U')[0]}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -2818,11 +2816,11 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-border hover:ring-primary transition-all" onClick={() => setActiveTab('profile')}>
                   <AvatarImage src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
-                  <AvatarFallback className="bg-accent text-primary font-medium">{user.email?.[0].toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="bg-accent text-primary font-medium">{(userProfile?.username?.[0] || user?.email?.[0] || 'U').toUpperCase()}</AvatarFallback>
                 </Avatar>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     try {
                       await signOut();
@@ -2831,7 +2829,7 @@ const StudentPortfolio: React.FC = () => {
                       // Force refresh if signOut fails
                       window.location.reload();
                     }
-                  }} 
+                  }}
                   className="rounded-full"
                   title="Se déconnecter"
                 >
@@ -2892,7 +2890,7 @@ const StudentPortfolio: React.FC = () => {
                                     className="object-cover"
                                   />
                                   <AvatarFallback className="bg-accent text-primary font-medium">
-                                    {userProfile?.username?.[0] || user.email?.[0]?.toUpperCase()}
+                                    {(userProfile?.username?.[0] || user?.email?.[0] || 'U').toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
                               </div>
@@ -2955,14 +2953,14 @@ const StudentPortfolio: React.FC = () => {
                     <div className={`story-ring ${index < 3 ? 'story-ring-unread' : ''} relative`}>
                       <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
                         <Avatar className="w-full h-full">
-                          <AvatarImage src={group.profile.avatar_url} className="object-cover" />
-                          <AvatarFallback className="bg-accent text-primary font-medium">{group.profile.username[0]}</AvatarFallback>
+                          <AvatarImage src={group.profile.avatar_url || undefined} className="object-cover" />
+                          <AvatarFallback className="bg-accent text-primary font-medium">{(group.profile.username || 'U')[0]}</AvatarFallback>
                         </Avatar>
                       </div>
                     </div>
                     {/* Story count badge */}
                     {group.hasMultiple && (
-                      <div className="absolute -bottom-1 -right-1 min-w-[20px] h-5 px-1.5 bg-gradient-to-r from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg">
+                      <div className="absolute -bottom-1 -right-1 min-w-[20px] h-[18px] px-1.5 bg-gradient-to-r from-[#ed3d66] to-[#f97316] rounded-full flex items-center justify-center border-2 border-card shadow-lg">
                         <span className="text-[10px] font-bold text-white">{group.stories.length}</span>
                       </div>
                     )}
@@ -3053,15 +3051,15 @@ const StudentPortfolio: React.FC = () => {
                                   className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
                                   onClick={() => setViewingUserId(item.user_id)}
                                 >
-                                  <AvatarImage src={item.profiles.avatar_url} />
-                                  <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
+                                  <AvatarImage src={item.profiles.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-accent text-primary font-medium">{(item.profiles.full_name || 'U')[0]}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <p
                                     className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                                     onClick={() => setViewingUserId(item.user_id)}
                                   >
-                                    {item.profiles.full_name}
+                                    {item.profiles.full_name || 'Unknown User'}
                                   </p>
                                   <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                                 </div>
@@ -3935,7 +3933,7 @@ const StudentPortfolio: React.FC = () => {
                 </div>
               </div>
             ) : (
-              reels.map((reel, index) => (
+              reels.map((reel) => (
                 <div
                   key={reel.id}
                   ref={(el) => {
@@ -3945,8 +3943,7 @@ const StudentPortfolio: React.FC = () => {
                       delete reelContainerRefs.current[reel.id];
                     }
                   }}
-                  data-reel-id={reel.id}
-                  className="h-screen w-full snap-start relative flex items-center justify-center bg-black"
+                  className="reel-item h-full w-full relative flex-shrink-0 bg-black"
                 >
                   {/* Video */}
                   <video
@@ -3980,14 +3977,14 @@ const StudentPortfolio: React.FC = () => {
                         className="w-10 h-10 ring-2 ring-white/20 cursor-pointer"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
-                        <AvatarImage src={reel.profiles.avatar_url} />
-                        <AvatarFallback>{reel.profiles.username[0]}</AvatarFallback>
+                        <AvatarImage src={reel.profiles.avatar_url || undefined} />
+                        <AvatarFallback>{(reel.profiles.username || 'U')[0]}</AvatarFallback>
                       </Avatar>
                       <span
                         className="text-white font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
-                        @{reel.profiles.username}
+                        @{reel.profiles.username || 'unknown'}
                       </span>
                       {user && reel.user_id !== user.id && (
                         <Button
@@ -4336,12 +4333,12 @@ const StudentPortfolio: React.FC = () => {
               <div className="p-5 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="ring-2 ring-accent">
-                    <AvatarImage src={selectedPost?.profiles.avatar_url} />
-                    <AvatarFallback className="bg-accent text-primary font-medium">{selectedPost?.profiles.full_name[0]}</AvatarFallback>
+                    <AvatarImage src={selectedPost?.profiles.avatar_url || undefined} />
+                    <AvatarFallback className="bg-accent text-primary font-medium">{(selectedPost?.profiles.full_name || 'U')[0]}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-sm">{selectedPost?.profiles.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{selectedPost?.profiles.course}</p>
+                    <p className="font-semibold text-sm">{selectedPost?.profiles.full_name || 'Sans nom'}</p>
+                    <p className="text-xs text-muted-foreground">{selectedPost?.profiles.course || 'Étudiant'}</p>
                   </div>
                 </div>
               </div>
@@ -4372,14 +4369,14 @@ const StudentPortfolio: React.FC = () => {
                       {postComments[selectedPost.id].map((comment) => (
                         <div key={comment.id} className="flex gap-3">
                           <Avatar className="w-8 h-8 flex-shrink-0">
-                            <AvatarImage src={comment.profiles.avatar_url} />
+                            <AvatarImage src={comment.profiles.avatar_url || undefined} />
                             <AvatarFallback className="bg-accent text-primary text-xs">
-                              {comment.profiles.full_name[0]}
+                              {(comment.profiles.full_name || 'U')[0]}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="bg-accent/50 rounded-lg p-2">
-                              <p className="text-sm font-semibold">{comment.profiles.username}</p>
+                              <p className="text-sm font-semibold">{comment.profiles.username || 'username'}</p>
                               <p className="text-sm text-foreground break-words">{comment.text}</p>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1 ml-2">
@@ -4495,9 +4492,9 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="story-ring p-0.5">
                   <Avatar className="w-9 h-9 bg-card">
-                    <AvatarImage src={selectedUserStories.profile.avatar_url} />
+                    <AvatarImage src={selectedUserStories.profile.avatar_url || undefined} />
                     <AvatarFallback className="bg-accent text-primary text-sm font-medium">
-                      {selectedUserStories.profile.username[0]}
+                      {(selectedUserStories.profile.username || 'U')[0]}
                     </AvatarFallback>
                   </Avatar>
                 </div>

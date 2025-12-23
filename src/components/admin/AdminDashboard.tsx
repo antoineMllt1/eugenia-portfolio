@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Shield,
     Search,
@@ -7,14 +7,13 @@ import {
     ChevronLeft,
     Mail,
     Calendar,
-    User as UserIcon,
     Loader2,
     AlertTriangle
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
     Table,
@@ -98,10 +97,12 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 throw new Error(error.error || 'Failed to delete user');
             }
 
-            setUsers(users.filter(u => u.id !== userId));
-            alert('Utilisateur supprimé avec succès.');
+            // Remove user from local state
+            setUsers(prev => prev.filter(u => u.id !== userId));
+            alert('Utilisateur supprimé avec succès');
         } catch (error: any) {
-            alert(`Erreur: ${error.message}`);
+            console.error('Error deleting user:', error);
+            alert(`Échec de la suppression: ${error.message || 'Unknown error'}`);
         }
     };
 
@@ -110,128 +111,129 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     }, []);
 
     const filteredUsers = users.filter(user =>
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase())
+        (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.username || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+        <div className="container mx-auto py-8 px-4 max-w-6xl">
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={onBack}>
                         <ChevronLeft className="w-5 h-5" />
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <Shield className="w-6 h-6 text-primary" />
-                            Espace Administration
+                        <h1 className="text-3xl font-bold flex items-center gap-3">
+                            <Shield className="w-8 h-8 text-primary" />
+                            Admin Dashboard
                         </h1>
-                        <p className="text-sm text-muted-foreground">Gérez les utilisateurs de la plateforme Eugenia</p>
+                        <p className="text-muted-foreground mt-1">Gérer les utilisateurs et les accès du hub</p>
                     </div>
                 </div>
                 <Button
-                    variant="outline"
                     onClick={fetchUsers}
                     disabled={refreshing}
+                    variant="outline"
                     className="gap-2"
                 >
                     <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                    Rafraîchir
+                    Actualiser
                 </Button>
             </div>
 
-            <Card className="p-4">
-                <div className="relative mb-6">
+            <Card className="p-6 mb-8">
+                <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                        placeholder="Rechercher un email, nom ou username..."
+                        placeholder="Rechercher par email, nom ou pseudo..."
                         className="pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+            </Card>
 
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Chargement des utilisateurs...</p>
-                    </div>
-                ) : (
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Utilisateur</TableHead>
-                                    <TableHead>Rôle</TableHead>
-                                    <TableHead>Inscription</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredUsers.map((user) => (
-                                    <TableRow key={user.id} className="group">
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Chargement des utilisateurs...</p>
+                </div>
+            ) : (
+                <div className="rounded-lg border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Utilisateur</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Rôle</TableHead>
+                                <TableHead>Date d'inscription</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredUsers.length > 0 ? (
+                                filteredUsers.map((user) => (
+                                    <TableRow key={user.id}>
                                         <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <Avatar className="w-8 h-8">
-                                                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
-                                                    <AvatarFallback>{user.full_name?.[0] || 'U'}</AvatarFallback>
+                                                    <AvatarFallback>{(user.full_name || user.username || 'U')[0]}</AvatarFallback>
                                                 </Avatar>
                                                 <div className="flex flex-col">
-                                                    <span className="font-semibold text-sm">{user.full_name || 'Sans nom'}</span>
-                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                        <Mail className="w-3 h-3" /> {user.email}
-                                                    </span>
-                                                    <span className="text-[10px] text-muted-foreground">@{user.username}</span>
+                                                    <span className="font-medium">{user.full_name || 'Sans nom'}</span>
+                                                    <span className="text-xs text-muted-foreground">@{user.username || 'username'}</span>
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {user.is_admin ? (
-                                                <Badge variant="default" className="bg-primary/20 text-primary border-primary/30">Admin</Badge>
-                                            ) : (
-                                                <Badge variant="outline" className="text-muted-foreground">User</Badge>
-                                            )}
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <Mail className="w-3 h-3 text-muted-foreground" />
+                                                {user.email}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <div className="flex gap-2">
+                                                {user.is_admin || user.role === 'admin' ? (
+                                                    <Badge variant="default" className="bg-primary hover:bg-primary">Admin</Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">Étudiant</Badge>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                 <Calendar className="w-3 h-3" />
-                                                {format(new Date(user.created_at), 'dd MMM yyyy')}
+                                                {user.created_at ? format(new Date(user.created_at), 'dd MMM yyyy') : 'N/A'}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {!user.is_admin && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => handleDeleteUser(user.id, user.email)}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => handleDeleteUser(user.id, user.email)}
+                                                title="Supprimer l'utilisateur"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
-                                ))}
-                                {filteredUsers.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            Aucun utilisateur trouvé.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </Card>
-
-            <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
-                <AlertTriangle className="w-5 h-5 text-primary" />
-                <p className="text-xs text-muted-foreground italic">
-                    Attention : La suppression d'un utilisateur est définitive et supprimera également toutes ses publications, commentaires et likes.
-                </p>
-            </div>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <AlertTriangle className="w-8 h-8 opacity-20" />
+                                            Aucun utilisateur trouvé
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
         </div>
     );
 }
