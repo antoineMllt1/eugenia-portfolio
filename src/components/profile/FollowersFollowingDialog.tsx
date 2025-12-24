@@ -31,12 +31,12 @@ interface FollowItem {
     isFollowing?: boolean
 }
 
-export function FollowersFollowingDialog({ 
-    userId, 
-    isOpen, 
-    onClose, 
+export function FollowersFollowingDialog({
+    userId,
+    isOpen,
+    onClose,
     type,
-    onFollowChange 
+    onFollowChange
 }: FollowersFollowingDialogProps) {
     const { user } = useAuth()
     const [items, setItems] = useState<FollowItem[]>([])
@@ -50,15 +50,13 @@ export function FollowersFollowingDialog({
             setItems([])
         }
     }, [isOpen, userId, type])
-    
+
     // Add fetchItems to dependency array warning fix
     // eslint-disable-next-line react-hooks/exhaustive-deps
 
     const fetchItems = async () => {
         setLoading(true)
         try {
-            let query
-
             let followsData: any[]
             let profileIds: string[]
 
@@ -108,11 +106,6 @@ export function FollowersFollowingDialog({
                 }
 
                 profilesData = data || []
-            }
-
-            if (profilesError) {
-                console.error(`Error fetching profiles for ${type}:`, profilesError)
-                throw profilesError
             }
 
             // Create a map of profile ID to profile data
@@ -207,8 +200,8 @@ export function FollowersFollowingDialog({
             if (error) throw error
 
             // Update the item
-            setItems(prev => prev.map(item => 
-                item.user.id === targetUserId 
+            setItems(prev => prev.map(item =>
+                item.user.id === targetUserId
                     ? { ...item, isFollowing: true }
                     : item
             ))
@@ -242,16 +235,16 @@ export function FollowersFollowingDialog({
                     ) : items.length === 0 ? (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">
-                                {type === 'followers' 
-                                    ? 'No followers yet' 
+                                {type === 'followers'
+                                    ? 'No followers yet'
                                     : 'Not following anyone yet'}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {items.map((item) => (
-                                <div 
-                                    key={item.id} 
+                                <div
+                                    key={item.id}
                                     className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
