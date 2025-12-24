@@ -17,11 +17,11 @@ interface FollowersFollowingDialogProps {
 
 interface UserProfile {
     id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    course?: string
-    bio?: string
+    username: string | null
+    full_name: string | null
+    avatar_url: string | null
+    course?: string | null
+    bio?: string | null
 }
 
 interface FollowItem {
@@ -31,12 +31,12 @@ interface FollowItem {
     isFollowing?: boolean
 }
 
-export function FollowersFollowingDialog({ 
-    userId, 
-    isOpen, 
-    onClose, 
+export function FollowersFollowingDialog({
+    userId,
+    isOpen,
+    onClose,
     type,
-    onFollowChange 
+    onFollowChange
 }: FollowersFollowingDialogProps) {
     const { user } = useAuth()
     const [items, setItems] = useState<FollowItem[]>([])
@@ -44,6 +44,7 @@ export function FollowersFollowingDialog({
     const [unfollowingIds, setUnfollowingIds] = useState<Set<string>>(new Set())
 
     useEffect(() => {
+        console.log('FollowersFollowingDialog useEffect:', { isOpen, userId, type })
         if (isOpen && userId) {
             fetchItems()
         } else {
@@ -54,79 +55,133 @@ export function FollowersFollowingDialog({
     const fetchItems = async () => {
         setLoading(true)
         try {
-            let query
+            console.log('Fetching items for type:', type, 'userId:', userId)
 
             if (type === 'followers') {
                 // Get users who follow this user
-                query = supabase
+                const { data: followsData, error: followsError } = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        follower_id,
-                        profiles:follower_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, follower_id')
                     .eq('following_id', userId)
                     .order('created_at', { ascending: false })
+
+                if (followsError) throw followsError
+
+                console.log('Follows data:', followsData)
+
+                if (!followsData || followsData.length === 0) {
+                    setItems([])
+                    setLoading(false)
+                    return
+                }
+
+                // Get profiles for all followers
+                const followerIds = followsData.map(f => f.follower_id)
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, username, full_name, avatar_url, course, bio')
+                    .in('id', followerIds)
+
+                if (profilesError) throw profilesError
+
+                console.log('Profiles data:', profilesData)
+
+                // Combine the data
+                const formattedItems: FollowItem[] = followsData.map(follow => {
+                    const profile = profilesData?.find(p => p.id === follow.follower_id)
+                    return {
+                        id: follow.id,
+                        user: profile || {
+                            id: follow.follower_id,
+                            username: 'unknown',
+                            full_name: 'Unknown User',
+                            avatar_url: '',
+                            course: '',
+                            bio: ''
+                        },
+                        created_at: follow.created_at,
+                    }
+                })
+
+                // Check if current user follows each person displayed in the list
+                if (user && formattedItems.length > 0) {
+                    const userIds = formattedItems.map(item => item.user.id)
+                    const { data: followData } = await supabase
+                        .from('follows')
+                        .select('following_id')
+                        .eq('follower_id', user.id)
+                        .in('following_id', userIds)
+
+                    const followingIds = new Set(followData?.map(f => f.following_id) || [])
+                    formattedItems.forEach(item => {
+                        item.isFollowing = followingIds.has(item.user.id)
+                    })
+                }
+
+                setItems(formattedItems)
             } else {
                 // Get users that this user follows
-                query = supabase
+                const { data: followsData, error: followsError } = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        following_id,
-                        profiles:following_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, following_id')
                     .eq('follower_id', userId)
                     .order('created_at', { ascending: false })
-            }
 
-            const { data, error } = await query
+                if (followsError) throw followsError
 
-            if (error) throw error
+                console.log('Following data:', followsData)
 
-            const formattedItems: FollowItem[] = (data || []).map((item: any) => ({
-                id: item.id,
-                user: type === 'followers' ? item.profiles : item.profiles,
-                created_at: item.created_at,
-            }))
+                if (!followsData || followsData.length === 0) {
+                    setItems([])
+                    setLoading(false)
+                    return
+                }
 
-            // Check if current user follows each person (only for followers list)
-            if (type === 'followers' && user) {
-                const userIds = formattedItems.map(item => item.user.id)
-                const { data: followData } = await supabase
-                    .from('follows')
-                    .select('following_id')
-                    .eq('follower_id', user.id)
-                    .in('following_id', userIds)
+                // Get profiles for all following
+                const followingIds = followsData.map(f => f.following_id)
+                const { data: profilesData, error: profilesError } = await supabase
+                    .from('profiles')
+                    .select('id, username, full_name, avatar_url, course, bio')
+                    .in('id', followingIds)
 
-                const followingIds = new Set(followData?.map(f => f.following_id) || [])
-                formattedItems.forEach(item => {
-                    item.isFollowing = followingIds.has(item.user.id)
+                if (profilesError) throw profilesError
+
+                console.log('Following profiles data:', profilesData)
+
+                // Combine the data
+                const formattedItems: FollowItem[] = followsData.map(follow => {
+                    const profile = profilesData?.find(p => p.id === follow.following_id)
+                    return {
+                        id: follow.id,
+                        user: profile || {
+                            id: follow.following_id,
+                            username: 'unknown',
+                            full_name: 'Unknown User',
+                            avatar_url: '',
+                            course: '',
+                            bio: ''
+                        },
+                        created_at: follow.created_at,
+                    }
                 })
-            } else if (type === 'following') {
-                // For following list, all items are followed by the user
-                formattedItems.forEach(item => {
-                    item.isFollowing = true
-                })
-            }
 
-            setItems(formattedItems)
+                // Check if current user follows each person displayed in the list
+                if (user && formattedItems.length > 0) {
+                    const userIds = formattedItems.map(item => item.user.id)
+                    const { data: followData } = await supabase
+                        .from('follows')
+                        .select('following_id')
+                        .eq('follower_id', user.id)
+                        .in('following_id', userIds)
+
+                    const followingIds = new Set(followData?.map(f => f.following_id) || [])
+                    formattedItems.forEach(item => {
+                        item.isFollowing = followingIds.has(item.user.id)
+                    })
+                }
+
+                setItems(formattedItems)
+            }
         } catch (error: any) {
             console.error(`Error fetching ${type}:`, error)
         } finally {
@@ -177,8 +232,8 @@ export function FollowersFollowingDialog({
             if (error) throw error
 
             // Update the item
-            setItems(prev => prev.map(item => 
-                item.user.id === targetUserId 
+            setItems(prev => prev.map(item =>
+                item.user.id === targetUserId
                     ? { ...item, isFollowing: true }
                     : item
             ))
@@ -212,31 +267,31 @@ export function FollowersFollowingDialog({
                     ) : items.length === 0 ? (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">
-                                {type === 'followers' 
-                                    ? 'No followers yet' 
+                                {type === 'followers'
+                                    ? 'No followers yet'
                                     : 'Not following anyone yet'}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {items.map((item) => (
-                                <div 
-                                    key={item.id} 
+                                <div
+                                    key={item.id}
                                     className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors"
                                 >
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <Avatar className="w-12 h-12 flex-shrink-0">
-                                            <AvatarImage src={item.user.avatar_url} />
+                                            <AvatarImage src={item.user.avatar_url || undefined} />
                                             <AvatarFallback className="bg-accent text-primary">
-                                                {item.user.full_name[0]}
+                                                {item.user.full_name?.[0] || '?'}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-sm truncate">
-                                                {item.user.full_name}
+                                                {item.user.full_name || 'Unknown User'}
                                             </p>
                                             <p className="text-xs text-muted-foreground truncate">
-                                                @{item.user.username}
+                                                @{item.user.username || 'unknown'}
                                             </p>
                                             {item.user.course && (
                                                 <p className="text-xs text-muted-foreground mt-0.5">

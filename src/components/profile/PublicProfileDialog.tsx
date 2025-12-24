@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FollowersFollowingDialog } from './FollowersFollowingDialog'
 import { supabase } from '@/lib/supabase'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -26,6 +27,14 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
     const [followingCount, setFollowingCount] = useState(0)
     const [isFollowing, setIsFollowing] = useState(false)
     const [loadingFollow, setLoadingFollow] = useState(false)
+    const [followersFollowingDialog, setFollowersFollowingDialog] = useState<{
+        isOpen: boolean;
+        type: 'followers' | 'following';
+    }>({ isOpen: false, type: 'followers' })
+
+    useEffect(() => {
+        console.log('followersFollowingDialog state changed:', followersFollowingDialog)
+    }, [followersFollowingDialog])
 
     useEffect(() => {
         if (userId && isOpen) {
@@ -165,122 +174,149 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
     if (!profile && !loading) return null
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col p-0 gap-0">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle>Student Profile</DialogTitle>
-                </DialogHeader>
+        <>
+            <Dialog open={isOpen} onOpenChange={onClose}>
+                <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col p-0 gap-0">
+                    <DialogHeader className="p-6 pb-2">
+                        <DialogTitle>Student Profile</DialogTitle>
+                    </DialogHeader>
 
-                <ScrollArea className="flex-1 p-6 pt-2">
-                    {loading ? (
-                        <div className="flex justify-center py-8">Loading...</div>
-                    ) : (
-                        <div className="space-y-8">
-                            {/* Header */}
-                            <div className="flex items-start gap-6">
-                                <Avatar className="w-24 h-24 border-2 border-primary/10">
-                                    <AvatarImage src={profile?.avatar_url || undefined} />
-                                    <AvatarFallback>{profile?.full_name?.[0]}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h2 className="text-2xl font-bold">{profile?.full_name}</h2>
-                                            <p className="text-muted-foreground">@{profile?.username}</p>
+                    <ScrollArea className="flex-1 p-6 pt-2">
+                        {loading ? (
+                            <div className="flex justify-center py-8">Loading...</div>
+                        ) : (
+                            <div className="space-y-8">
+                                {/* Header */}
+                                <div className="flex items-start gap-6">
+                                    <Avatar className="w-24 h-24 border-2 border-primary/10">
+                                        <AvatarImage src={profile?.avatar_url || undefined} />
+                                        <AvatarFallback>{profile?.full_name?.[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h2 className="text-2xl font-bold">{profile?.full_name}</h2>
+                                                <p className="text-muted-foreground">@{profile?.username}</p>
+                                            </div>
+                                            {user && userId !== user.id && (
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => onStartConversation?.(userId!)}
+                                                        className="rounded-full"
+                                                    >
+                                                        <Send className="w-4 h-4 mr-2" />
+                                                        Message
+                                                    </Button>
+                                                    <Button
+                                                        variant={isFollowing ? "outline" : "default"}
+                                                        onClick={isFollowing ? handleUnfollow : handleFollow}
+                                                        disabled={loadingFollow}
+                                                        className="rounded-full"
+                                                    >
+                                                        {loadingFollow ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                        ) : null}
+                                                        {isFollowing ? 'Unfollow' : 'Follow'}
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
-                                        {user && userId !== user.id && (
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => onStartConversation?.(userId!)}
-                                                    className="rounded-full"
-                                                >
-                                                    <Send className="w-4 h-4 mr-2" />
-                                                    Message
-                                                </Button>
-                                                <Button
-                                                    variant={isFollowing ? "outline" : "default"}
-                                                    onClick={isFollowing ? handleUnfollow : handleFollow}
-                                                    disabled={loadingFollow}
-                                                    className="rounded-full"
-                                                >
-                                                    {loadingFollow ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                                    ) : null}
-                                                    {isFollowing ? 'Unfollow' : 'Follow'}
-                                                </Button>
+
+                                        {/* Stats */}
+                                        <div className="flex items-center gap-4 pt-2">
+                                            <div>
+                                                <span className="font-semibold">{projects.length}</span>
+                                                <span className="text-muted-foreground text-sm ml-1">projects</span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    console.log('Followers button clicked, userId:', userId)
+                                                    setFollowersFollowingDialog({ isOpen: true, type: 'followers' })
+                                                }}
+                                                className="text-left cursor-pointer hover:opacity-80 transition-opacity"
+                                            >
+                                                <span className="font-semibold">{followersCount}</span>
+                                                <span className="text-muted-foreground text-sm ml-1">followers</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    console.log('Following button clicked, userId:', userId)
+                                                    setFollowersFollowingDialog({ isOpen: true, type: 'following' })
+                                                }}
+                                                className="text-left cursor-pointer hover:opacity-80 transition-opacity"
+                                            >
+                                                <span className="font-semibold">{followingCount}</span>
+                                                <span className="text-muted-foreground text-sm ml-1">following</span>
+                                            </button>
+                                        </div>
+
+                                        {profile?.course && (
+                                            <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+                                                {profile.course}
                                             </div>
                                         )}
+
+                                        {profile?.bio && (
+                                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                                {profile.bio}
+                                            </p>
+                                        )}
                                     </div>
+                                </div>
 
-                                    {/* Stats */}
-                                    <div className="flex items-center gap-4 pt-2">
-                                        <div>
-                                            <span className="font-semibold">{projects.length}</span>
-                                            <span className="text-muted-foreground text-sm ml-1">projects</span>
+                                {/* Projects Grid */}
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-4">Projects</h3>
+                                    {projects.length > 0 ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {projects.map((project) => (
+                                                <div key={project.id} className="group relative aspect-video rounded-lg overflow-hidden bg-muted border">
+                                                    {project.images?.[0] ? (
+                                                        <img
+                                                            src={project.images[0]}
+                                                            alt={project.title}
+                                                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                                            No Image
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-4 text-center">
+                                                        <p className="font-bold truncate w-full">{project.title}</p>
+                                                        <div className="flex items-center gap-1 mt-2 text-sm">
+                                                            <Heart className="w-4 h-4 fill-white" />
+                                                            <span>{project.likes_count?.[0]?.count || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div>
-                                            <span className="font-semibold">{followersCount}</span>
-                                            <span className="text-muted-foreground text-sm ml-1">followers</span>
+                                    ) : (
+                                        <div className="text-center py-12 text-muted-foreground bg-muted/50 rounded-lg border border-dashed">
+                                            No projects yet
                                         </div>
-                                        <div>
-                                            <span className="font-semibold">{followingCount}</span>
-                                            <span className="text-muted-foreground text-sm ml-1">following</span>
-                                        </div>
-                                    </div>
-
-                                    {profile?.course && (
-                                        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
-                                            {profile.course}
-                                        </div>
-                                    )}
-
-                                    {profile?.bio && (
-                                        <p className="text-sm text-muted-foreground leading-relaxed">
-                                            {profile.bio}
-                                        </p>
                                     )}
                                 </div>
                             </div>
+                        )}
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
 
-                            {/* Projects Grid */}
-                            <div>
-                                <h3 className="text-lg font-semibold mb-4">Projects</h3>
-                                {projects.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {projects.map((project) => (
-                                            <div key={project.id} className="group relative aspect-video rounded-lg overflow-hidden bg-muted border">
-                                                {project.images?.[0] ? (
-                                                    <img
-                                                        src={project.images[0]}
-                                                        alt={project.title}
-                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                        No Image
-                                                    </div>
-                                                )}
-                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-4 text-center">
-                                                    <p className="font-bold truncate w-full">{project.title}</p>
-                                                    <div className="flex items-center gap-1 mt-2 text-sm">
-                                                        <Heart className="w-4 h-4 fill-white" />
-                                                        <span>{project.likes_count?.[0]?.count || 0}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-12 text-muted-foreground bg-muted/50 rounded-lg border border-dashed">
-                                        No projects yet
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </ScrollArea>
-            </DialogContent>
-        </Dialog>
+            {userId && (
+                <FollowersFollowingDialog
+                    userId={userId}
+                    isOpen={followersFollowingDialog.isOpen}
+                    onClose={() => setFollowersFollowingDialog(prev => ({ ...prev, isOpen: false }))}
+                    type={followersFollowingDialog.type}
+                    onFollowChange={() => {
+                        fetchFollowCounts(userId)
+                        onFollowChange?.()
+                    }}
+                />
+            )}
+        </>
     )
 }
