@@ -1172,14 +1172,19 @@ const StudentPortfolio: React.FC = () => {
   };
 
   const fetchAvailableUsers = useCallback(async () => {
-    if (!user) return;
-
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url, course')
-        .neq('id', user.id)
         .order('full_name', { ascending: true });
+
+      // Only exclude current user if we are in conversation mode (not strictly handled here but good practice if we wanted separate lists)
+      // For general search, we want all users.
+      // if (user) {
+      //   query = query.neq('id', user.id);
+      // }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -1187,14 +1192,15 @@ const StudentPortfolio: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching users:', error);
     }
-  }, [user]);
+  }, []); // Removed user dependency as we don't strictly filter by it anymore
 
-  // Fetch available users when new conversation dialog opens
+  // Fetch available users when new conversation dialog opens or when searching
+  // Fetch available users when new conversation dialog opens or when searching
   useEffect(() => {
-    if (isNewConversationOpen && user) {
+    if (isNewConversationOpen || activeTab === 'search') {
       fetchAvailableUsers();
     }
-  }, [isNewConversationOpen, user, fetchAvailableUsers]);
+  }, [isNewConversationOpen, activeTab, fetchAvailableUsers]);
 
   // Auto-play reels when they enter viewport
   useEffect(() => {
@@ -2072,12 +2078,21 @@ const StudentPortfolio: React.FC = () => {
   const filteredPosts = posts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (post.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (post.profiles?.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (post.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredReels = reels.filter(reel =>
     reel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (reel.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (reel.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (reel.profiles?.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (reel.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUsers = availableUsers.filter(u =>
+    (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate interaction score (likes + comments + saves)
@@ -2514,6 +2529,7 @@ const StudentPortfolio: React.FC = () => {
             <ScrollArea className="max-h-[400px]">
               <div className="space-y-2">
                 {availableUsers
+                  .filter(u => u.id !== user?.id) // Exclude current user
                   .filter(u =>
                     (u.username || '').toLowerCase().includes(newConversationSearch.toLowerCase()) ||
                     (u.full_name || '').toLowerCase().includes(newConversationSearch.toLowerCase())
@@ -3257,6 +3273,32 @@ const StudentPortfolio: React.FC = () => {
                 className="pl-12 h-12 rounded-full bg-muted border-0 focus:ring-2 focus:ring-primary/20"
               />
             </div>
+
+            {/* Matching People Section */}
+            {searchQuery && filteredUsers.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg text-foreground">Personnes</h3>
+                <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                  {filteredUsers.map(u => (
+                    <div
+                      key={u.id}
+                      className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer group"
+                      onClick={() => setViewingUserId(u.id)}
+                    >
+                      <Avatar className="w-16 h-16 ring-2 ring-transparent group-hover:ring-primary transition-all">
+                        <AvatarImage src={u.avatar_url || undefined} />
+                        <AvatarFallback>{u.full_name?.[0] || '?'}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-center text-muted-foreground group-hover:text-foreground truncate w-full transition-colors">
+                        {u.username}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {searchQuery && <h3 className="font-semibold text-lg text-foreground">Projets</h3>}
             <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
               {filteredPosts.map((post) => (
                 <div
