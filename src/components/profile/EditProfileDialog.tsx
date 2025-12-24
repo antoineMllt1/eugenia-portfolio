@@ -21,14 +21,14 @@ const CLASS_OPTIONS = [
 
 interface UserProfile {
     id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    bio?: string
-    course?: string
-    github_url?: string
-    linkedin_url?: string
-    role?: string
+    username: string | null
+    full_name: string | null
+    avatar_url: string | null
+    bio?: string | null
+    course?: string | null
+    github_url?: string | null
+    linkedin_url?: string | null
+    role?: string | null
 }
 
 interface Highlight {
@@ -304,8 +304,8 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                         type="button"
                         onClick={() => setActiveTab('profile')}
                         className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'profile'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">
@@ -317,8 +317,8 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                         type="button"
                         onClick={() => setActiveTab('highlights')}
                         className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${activeTab === 'highlights'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
                             }`}
                     >
                         <div className="flex items-center justify-center gap-2">

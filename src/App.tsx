@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info } from 'lucide-react';
+import { MenuBar } from '@/components/ui/glow-menu';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
+import { ScrollingLogo } from '@/components/ui/scrolling-logo';
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,107 +18,36 @@ import { PublicProfileDialog } from './components/profile/PublicProfileDialog';
 import { FollowersFollowingDialog } from './components/profile/FollowersFollowingDialog';
 import { CreateStoryDialog } from './components/story/CreateStoryDialog';
 import { CreateReelDialog } from './components/reel/CreateReelDialog';
-import { MenuBar } from '@/components/ui/glow-menu';
-import { ThemeSwitcher } from '@/components/ui/theme-switcher';
-import { ScrollingLogo } from '@/components/ui/scrolling-logo';
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Shield } from 'lucide-react';
+import type {
+  StudentProfile,
+  ProjectPost,
+  Reel,
+  Comment,
+  StoryItem,
+  HighlightStory,
+  Highlight,
+  GroupedUserStories,
+  PostOrReel,
+} from '@/types';
 
-// Types
-interface StudentProfile {
+// Shared types imported above
+
+// Wrapper for local extended types if needed
+interface Conversation {
   id: string;
-  full_name: string;
-  username: string;
-  avatar_url: string;
-  bio?: string;
-  course?: string;
-  github_url?: string;
-  linkedin_url?: string;
-  role?: string;
+  user: StudentProfile;
+  lastMessage: string;
+  timestamp: string;
+  conversation_id: string;
 }
 
-interface ProjectPost {
+interface ChatMessage {
   id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  images: string[];
-  video_url?: string;
-  post_type?: 'post' | 'reel';
-  tags: string[];
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  liked_by_user?: boolean;
-  saved_by_user?: boolean;
-}
-
-interface Reel {
-  id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  video_url: string;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  liked_by_user?: boolean;
-  saved_by_user?: boolean;
-}
-
-type SavedPostItem = (ProjectPost & { type: 'post' }) | (Reel & { type: 'reel'; images: string[] });
-
-type PostOrReel = ProjectPost | (Reel & { images: string[]; tags?: string[] });
-
-interface Comment {
-  id: string;
-  post_id: string;
-  user_id: string;
-  text: string;
-  created_at: string;
-  profiles: StudentProfile;
-}
-
-interface StoryItem {
-  id: string;
-  user_id: string;
-  profiles: StudentProfile;
-  title: string;
-  description: string;
-  image_url: string;
-  media_url?: string; // New field for both images and videos
-  media_type?: 'image' | 'video'; // New field to distinguish media type
-  progress?: number;
-  achievement?: string;
-  created_at: string;
-}
-
-interface HighlightStory {
-  id: string;
-  image: string;
-  media_url?: string; // New field for videos
-  media_type?: 'image' | 'video'; // New field to distinguish media type
-  description: string;
-}
-
-interface Highlight {
-  id: string;
-  user_id: string;
-  title: string;
-  cover_image: string | null;
-  stories: HighlightStory[];
-  created_at?: string;
-  updated_at?: string;
-}
-
-// Grouped stories by user
-interface GroupedUserStories {
-  user_id: string;
-  profile: StudentProfile;
-  stories: StoryItem[];
-  hasMultiple: boolean;
+  content: string;
+  sender_id: string;
+  created_at: string | null;
+  sender: StudentProfile;
 }
 
 // Main Component
@@ -142,20 +75,8 @@ const StudentPortfolio: React.FC = () => {
   const [messageSearch, setMessageSearch] = useState('');
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [currentInterlocutor, setCurrentInterlocutor] = useState<StudentProfile | null>(null);
-  const [conversations, setConversations] = useState<Array<{
-    id: string;
-    user: StudentProfile;
-    lastMessage: string;
-    timestamp: string;
-    conversation_id: string;
-  }>>([]);
-  const [messages, setMessages] = useState<Array<{
-    id: string;
-    content: string;
-    sender_id: string;
-    created_at: string;
-    sender: StudentProfile;
-  }>>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessageText, setNewMessageText] = useState('');
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -203,13 +124,13 @@ const StudentPortfolio: React.FC = () => {
         .filter(s => selectedArchivedStories.includes(s.id))
         .map(s => ({
           id: s.id,
-          image: s.media_url || s.image,
-          media_url: s.media_url || s.image,
+          image: s.media_url, // Required by HighlightStory interface
+          media_url: s.media_url,
           media_type: s.media_type || 'image',
           description: ''
         }));
 
-      const coverImage = selectedStoryObjects[0]?.image || null;
+      const coverImage = selectedStoryObjects[0]?.media_url || null;
 
       // Insert into Supabase
       const { data, error } = await supabase
@@ -218,7 +139,7 @@ const StudentPortfolio: React.FC = () => {
           user_id: user.id,
           title: highlightName.trim(),
           cover_image: coverImage,
-          stories: selectedStoryObjects,
+          stories: selectedStoryObjects as any,
         })
         .select()
         .single();
@@ -237,17 +158,18 @@ const StudentPortfolio: React.FC = () => {
       }
 
       // Update local state with the new highlight
-      const newHighlight: Highlight = {
-        id: data.id,
-        user_id: data.user_id,
-        title: data.title,
-        cover_image: data.cover_image,
-        stories: Array.isArray(data.stories) ? data.stories : [],
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-      };
-
-      setProfileHighlights(prev => [...prev, newHighlight]);
+      if (data) {
+        const newHighlight: Highlight = {
+          id: data.id,
+          user_id: data.user_id,
+          title: data.title,
+          cover_image: data.cover_image,
+          stories: Array.isArray(data.stories) ? (data.stories as any as HighlightStory[]) : [],
+          created_at: data.created_at || undefined,
+          updated_at: data.updated_at || undefined,
+        };
+        setProfileHighlights(prev => [...prev, newHighlight]);
+      }
       setShowHighlightModal(false);
       setHighlightName('');
       setSelectedArchivedStories([]);
@@ -274,8 +196,8 @@ const StudentPortfolio: React.FC = () => {
       const currentStory = selectedUserStories.stories[currentStoryIndex];
       const newStoryObj: HighlightStory = {
         id: currentStory.id,
-        image: currentStory.image_url,
-        media_url: currentStory.media_url || currentStory.image_url,
+        image: currentStory.media_url, // Required by HighlightStory interface
+        media_url: currentStory.media_url,
         media_type: currentStory.media_type || 'image',
         description: currentStory.description || '',
       };
@@ -294,9 +216,9 @@ const StudentPortfolio: React.FC = () => {
       const { error } = await supabase
         .from('highlights')
         .update({
-          stories: updatedStories,
+          stories: updatedStories as any, // Cast to any to bypass Json type check
           // Update cover_image if this is the first story
-          cover_image: currentHighlight.cover_image || newStoryObj.image,
+          cover_image: currentHighlight.cover_image || newStoryObj.media_url,
         })
         .eq('id', highlightId)
         .eq('user_id', user.id); // Security: ensure user owns this highlight
@@ -313,7 +235,7 @@ const StudentPortfolio: React.FC = () => {
           ? {
             ...h,
             stories: updatedStories,
-            cover_image: h.cover_image || newStoryObj.image,
+            cover_image: h.cover_image || newStoryObj.media_url,
           }
           : h
       ));
@@ -362,7 +284,7 @@ const StudentPortfolio: React.FC = () => {
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
 
   // Saved Posts State
-  const [savedPosts, setSavedPosts] = useState<SavedPostItem[]>([]);
+  const [savedPosts, setSavedPosts] = useState<PostOrReel[]>([]);
   const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
 
   // Follow State
@@ -385,15 +307,16 @@ const StudentPortfolio: React.FC = () => {
   // Group stories by user
   const groupedStories = useMemo<GroupedUserStories[]>(() => {
     const grouped = stories.reduce((acc, story) => {
-      const existingGroup = acc.find(g => g.user_id === story.user_id);
+      const existingGroup = acc.find(g => g.userId === story.user_id);
       if (existingGroup) {
         existingGroup.stories.push(story);
       } else {
         acc.push({
-          user_id: story.user_id,
+          userId: story.user_id,
           profile: story.profiles,
           stories: [story],
-          hasMultiple: false
+          hasMultiple: false,
+          hasUnread: false
         });
       }
       return acc;
@@ -429,7 +352,7 @@ const StudentPortfolio: React.FC = () => {
       setCurrentStoryIndex(prev => prev + 1);
     } else {
       // Move to next user's stories or close
-      const currentUserIndex = groupedStories.findIndex(g => g.user_id === selectedUserStories.user_id);
+      const currentUserIndex = groupedStories.findIndex(g => g.userId === selectedUserStories.userId);
       if (currentUserIndex < groupedStories.length - 1) {
         setSelectedUserStories(groupedStories[currentUserIndex + 1]);
         setCurrentStoryIndex(0);
@@ -446,7 +369,7 @@ const StudentPortfolio: React.FC = () => {
       setCurrentStoryIndex(prev => prev - 1);
     } else {
       // Move to previous user's stories
-      const currentUserIndex = groupedStories.findIndex(g => g.user_id === selectedUserStories.user_id);
+      const currentUserIndex = groupedStories.findIndex(g => g.userId === selectedUserStories.userId);
       if (currentUserIndex > 0) {
         const prevGroup = groupedStories[currentUserIndex - 1];
         setSelectedUserStories(prevGroup);
@@ -524,14 +447,14 @@ const StudentPortfolio: React.FC = () => {
 
     // Prevent multiple simultaneous calls for the same conversation
     if (fetchingInterlocutorRef.current === conversationId) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('fetchInterlocutorInfo already in progress for conversation:', conversationId);
       }
       return;
     }
 
     // Only log in development to reduce console noise
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.debug('fetchInterlocutorInfo called for conversation:', conversationId);
     }
 
@@ -541,10 +464,10 @@ const StudentPortfolio: React.FC = () => {
     // Use ref to avoid dependency on conversations array
     const conv = conversationsRef.current.find(c => c.id === conversationId || c.conversation_id === conversationId);
     if (conv && conv.user && conv.user.id !== user.id) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.log('Using interlocutor from conversations list:', conv.user);
       }
-      setCurrentInterlocutor(conv.user);
+      setCurrentInterlocutor(conv.user as StudentProfile);
       fetchingInterlocutorRef.current = null;
       // Don't fetch from DB if we already have it from the list (avoid unnecessary calls)
       return;
@@ -571,14 +494,14 @@ const StudentPortfolio: React.FC = () => {
       if (!otherUserId) {
         // Try to use conversation list data if available
         if (conv && conv.user && conv.user.id !== user.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.log('Using interlocutor from conversations list as fallback:', conv.user);
           }
           setCurrentInterlocutor(conv.user);
           return;
         }
 
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.warn('Could not find interlocutor for conversation:', conversationId);
         }
         return;
@@ -611,11 +534,11 @@ const StudentPortfolio: React.FC = () => {
         };
         // Only update if it's different to avoid unnecessary re-renders
         if (!currentInterlocutor || currentInterlocutor.id !== interlocutorData.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.debug('Setting currentInterlocutor:', interlocutorData);
           }
           setCurrentInterlocutor(interlocutorData);
-        } else if (process.env.NODE_ENV === 'development') {
+        } else if (import.meta.env.DEV) {
           console.debug('currentInterlocutor already set, skipping update');
         }
       } else {
@@ -629,7 +552,7 @@ const StudentPortfolio: React.FC = () => {
       console.error('Error in fetchInterlocutorInfo:', error);
       // Try to use conversation list data if available
       if (conv && conv.user && conv.user.id !== user.id) {
-        setCurrentInterlocutor(conv.user);
+        setCurrentInterlocutor(conv.user as StudentProfile);
       }
     } finally {
       fetchingInterlocutorRef.current = null;
@@ -639,7 +562,7 @@ const StudentPortfolio: React.FC = () => {
   // Fetch messages when a conversation is selected
   useEffect(() => {
     if (selectedConversation && user) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Conversation selected:', selectedConversation);
       }
       setMessages([]); // Clear previous messages
@@ -650,7 +573,7 @@ const StudentPortfolio: React.FC = () => {
       if (conv && conv.user && conv.user.id !== user.id) {
         // Only update if it's different to avoid unnecessary re-renders
         if (!currentInterlocutor || currentInterlocutor.id !== conv.user.id) {
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.debug('Using interlocutor from conversations list:', conv.user);
           }
           setCurrentInterlocutor(conv.user);
@@ -714,7 +637,7 @@ const StudentPortfolio: React.FC = () => {
 
     // Prevent multiple simultaneous calls
     if (fetchingConversationsRef.current) {
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('fetchConversations already in progress, skipping...');
       }
       return;
@@ -733,7 +656,9 @@ const StudentPortfolio: React.FC = () => {
         throw rpcError;
       }
 
-      if (!conversationsData || conversationsData.length === 0) {
+      const conversationsArray = (conversationsData as any[]) || [];
+
+      if (!conversationsArray || conversationsArray.length === 0) {
         setConversations([]);
         conversationsRef.current = [];
         return;
@@ -741,7 +666,7 @@ const StudentPortfolio: React.FC = () => {
 
       // Format conversations from RPC result and remove duplicates
       const seenConversationIds = new Set<string>();
-      const formattedConversations = conversationsData
+      const formattedConversations = conversationsArray
         .filter((conv: any) => {
           // Filter out duplicates based on conversation_id
           if (seenConversationIds.has(conv.conversation_id)) {
@@ -772,8 +697,8 @@ const StudentPortfolio: React.FC = () => {
 
       // Sort by updated_at (most recent first)
       formattedConversations.sort((a, b) => {
-        const aConv = conversationsData.find((c: any) => c.conversation_id === a.id);
-        const bConv = conversationsData.find((c: any) => c.conversation_id === b.id);
+        const aConv = conversationsArray.find((c: any) => c.conversation_id === a.id);
+        const bConv = conversationsArray.find((c: any) => c.conversation_id === b.id);
         const aUpdated = aConv?.conversation_updated_at;
         const bUpdated = bConv?.conversation_updated_at;
 
@@ -787,7 +712,7 @@ const StudentPortfolio: React.FC = () => {
 
       setConversations(formattedConversations);
       conversationsRef.current = formattedConversations; // Update ref
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Conversations chargées:', formattedConversations.length);
       }
     } catch (error: any) {
@@ -852,6 +777,12 @@ const StudentPortfolio: React.FC = () => {
             full_name: profile?.full_name || 'User',
             avatar_url: profile?.avatar_url || '',
             course: profile?.course || '',
+            bio: profile?.bio || null,
+            github_url: profile?.github_url || null,
+            linkedin_url: profile?.linkedin_url || null,
+            role: profile?.role || null,
+            is_admin: profile?.is_admin || null,
+            language: profile?.language || null,
           },
         };
       });
@@ -880,11 +811,12 @@ const StudentPortfolio: React.FC = () => {
       // Fetch profile separately
       let profileData: any = null;
       if (messageData?.sender_id) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url, course')
           .eq('id', messageData.sender_id)
           .single();
+        if (profileError) throw profileError;
         profileData = profile;
       }
 
@@ -954,6 +886,12 @@ const StudentPortfolio: React.FC = () => {
             full_name: profile?.full_name || 'User',
             avatar_url: profile?.avatar_url || '',
             course: profile?.course || '',
+            bio: profile?.bio || null,
+            github_url: profile?.github_url || null,
+            linkedin_url: profile?.linkedin_url || null,
+            role: profile?.role || null,
+            is_admin: profile?.is_admin || null,
+            language: profile?.language || null,
           },
         }];
       });
@@ -1007,8 +945,8 @@ const StudentPortfolio: React.FC = () => {
           const filtered = prev.filter(msg => msg.id !== tempId && msg.id !== data.id);
           const profile = userProfile ? {
             id: userProfile.id,
-            username: userProfile.username,
-            full_name: userProfile.full_name,
+            username: userProfile.username || user.email?.split('@')[0] || 'user',
+            full_name: userProfile.full_name || 'You',
             avatar_url: userProfile.avatar_url || '',
             course: userProfile.course || '',
           } : {
@@ -1068,7 +1006,7 @@ const StudentPortfolio: React.FC = () => {
         // Continue to create new conversation if check fails
       } else if (existingConversationId) {
         // Conversation already exists, use it
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.debug('Found existing conversation:', existingConversationId);
         }
         setSelectedConversation(existingConversationId);
@@ -1159,7 +1097,7 @@ const StudentPortfolio: React.FC = () => {
       });
 
       if (verifyError) {
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.error('Error verifying other participant:', verifyError);
         }
       } else if (!otherUserIdFromRPC) {
@@ -1168,7 +1106,7 @@ const StudentPortfolio: React.FC = () => {
           conversation_id_param: conversationId,
           user_id_param: targetUserId
         });
-        if (addP2Error && process.env.NODE_ENV === 'development') {
+        if (addP2Error && import.meta.env.DEV) {
           console.error('Error adding other participant via RPC:', addP2Error);
         }
 
@@ -1222,12 +1160,12 @@ const StudentPortfolio: React.FC = () => {
       });
 
       // Silently handle notification errors - they're not critical for the conversation to work
-      if (error && process.env.NODE_ENV === 'development') {
+      if (error && import.meta.env.DEV) {
         console.debug('Notification email error (non-critical):', error);
       }
     } catch (error: any) {
       // Silently handle notification errors - they're not critical for the conversation to work
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.debug('Notification email error (non-critical):', error);
       }
     }
@@ -1397,12 +1335,16 @@ const StudentPortfolio: React.FC = () => {
 
   const fetchUserProfile = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return;
+    }
     if (data) {
       setUserProfile(data);
     }
@@ -1646,9 +1588,15 @@ const StudentPortfolio: React.FC = () => {
         const baseItem = {
           id: post.id,
           user_id: post.user_id,
-          profiles: post.profiles,
+          profiles: {
+            id: post.profiles?.id,
+            username: post.profiles?.username || 'user',
+            full_name: post.profiles?.full_name || 'User',
+            avatar_url: post.profiles?.avatar_url || '',
+            course: post.profiles?.course || '',
+          },
           title: post.title,
-          description: post.description,
+          description: post.description || '',
           likes_count: post.likes?.length || 0,
           comments_count: post.comments_count || 0,
           created_at: post.created_at,
@@ -1659,17 +1607,20 @@ const StudentPortfolio: React.FC = () => {
         if (isReel) {
           return {
             ...baseItem,
-            type: 'reel' as const,
+            post_type: 'reel' as const,
             video_url: post.video_url,
             images: [post.video_url],
-          };
+            tags: [], // Add required property
+            profiles: baseItem.profiles // Ensure robust typing
+          } as PostOrReel;
         } else {
           return {
             ...baseItem,
-            type: 'post' as const,
+            description: post.description || '',
             images: post.images || [],
             tags: post.tags || [],
-          };
+            profiles: baseItem.profiles
+          } as PostOrReel;
         }
       });
 
@@ -1715,6 +1666,13 @@ const StudentPortfolio: React.FC = () => {
           .filter((post: any) => !post.post_type || post.post_type === 'post')
           .map((post: any) => ({
             ...post,
+            profiles: {
+              id: post.profiles?.id,
+              username: post.profiles?.username || 'user',
+              full_name: post.profiles?.full_name || 'User',
+              avatar_url: post.profiles?.avatar_url || '',
+              course: post.profiles?.course || '',
+            },
             likes_count: post.likes?.length || 0,
             comments_count: post.comments_count || 0,
             saves_count: post.saved_posts?.length || 0,
@@ -1727,9 +1685,15 @@ const StudentPortfolio: React.FC = () => {
           .map((post: any) => ({
             id: post.id,
             user_id: post.user_id,
-            profiles: post.profiles,
+            profiles: {
+              id: post.profiles?.id,
+              username: post.profiles?.username || 'user',
+              full_name: post.profiles?.full_name || 'User',
+              avatar_url: post.profiles?.avatar_url || '',
+              course: post.profiles?.course || '',
+            },
             title: post.title,
-            description: post.description,
+            description: post.description || '',
             video_url: post.video_url,
             post_type: 'reel' as const,
             likes_count: post.likes?.length || 0,
@@ -1791,6 +1755,12 @@ const StudentPortfolio: React.FC = () => {
           const isVideo = story.media_type === 'video' || (mediaUrl && /\.(mp4|webm|ogg|mov)(\?|$)/i.test(mediaUrl));
           return {
             ...story,
+            profiles: {
+              id: story.profiles?.id,
+              username: story.profiles?.username || 'user',
+              full_name: story.profiles?.full_name || 'User',
+              avatar_url: story.profiles?.avatar_url || '',
+            },
             media_url: mediaUrl,
             media_type: story.media_type || (isVideo ? 'video' : 'image')
           };
@@ -1853,7 +1823,8 @@ const StudentPortfolio: React.FC = () => {
 
     const isCurrentlyLiked = targetItem.liked_by_user;
     const newLikedState = !isCurrentlyLiked;
-    const newLikesCount = isCurrentlyLiked ? targetItem.likes_count - 1 : targetItem.likes_count + 1;
+    const currentLikes = targetItem.likes_count || 0;
+    const newLikesCount = isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
 
     try {
       if (newLikedState) {
@@ -2100,13 +2071,13 @@ const StudentPortfolio: React.FC = () => {
 
   const filteredPosts = posts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (post.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const filteredReels = reels.filter(reel =>
     reel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    reel.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (reel.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate interaction score (likes + comments + saves)
@@ -2119,9 +2090,10 @@ const StudentPortfolio: React.FC = () => {
   };
 
   // Combine posts and reels for the feed
+  // Combine posts and reels for the feed
   const allFeedItems = [
-    ...filteredPosts.map(p => ({ ...p, type: 'post' as const })),
-    ...filteredReels.map(r => ({ ...r, type: 'reel' as const, images: [r.video_url], tags: [] }))
+    ...filteredPosts.map(p => ({ ...p, post_type: 'post' as const })),
+    ...filteredReels.map(r => ({ ...r, post_type: 'reel' as const, images: [r.video_url], tags: [], description: r.description || '' }))
   ];
 
   // Sort by date for "all posts" section
@@ -2136,7 +2108,6 @@ const StudentPortfolio: React.FC = () => {
     .slice(0, 10); // Top 10 most interactive posts
 
   // Keep feedItems for backward compatibility (used in other places)
-  const feedItems = feedItemsAll;
 
   // Early return with loading state if auth is still loading
   if (authLoading) {
@@ -2263,14 +2234,14 @@ const StudentPortfolio: React.FC = () => {
                   <div>
                     {conversations
                       .filter(c =>
-                        c.user.username.toLowerCase().includes(messageSearch.toLowerCase()) ||
-                        c.user.full_name.toLowerCase().includes(messageSearch.toLowerCase())
+                        (c.user.username || '').toLowerCase().includes(messageSearch.toLowerCase()) ||
+                        (c.user.full_name || '').toLowerCase().includes(messageSearch.toLowerCase())
                       )
                       .map((conv) => (
                         <button
                           key={conv.conversation_id || conv.id}
                           onClick={() => {
-                            if (process.env.NODE_ENV === 'development') {
+                            if (import.meta.env.DEV) {
                               console.debug('Conversation clicked:', conv.id, 'User:', conv.user);
                             }
                             // Set interlocutor immediately from the conversation
@@ -2284,8 +2255,8 @@ const StudentPortfolio: React.FC = () => {
                             }`}
                         >
                           <Avatar className="w-12 h-12 flex-shrink-0">
-                            <AvatarImage src={conv.user.avatar_url} />
-                            <AvatarFallback className="bg-primary/20 text-primary">{conv.user.full_name[0]}</AvatarFallback>
+                            <AvatarImage src={conv.user.avatar_url || undefined} />
+                            <AvatarFallback className="bg-primary/20 text-primary">{conv.user.full_name?.[0] || '?'}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
@@ -2333,7 +2304,7 @@ const StudentPortfolio: React.FC = () => {
                               setIsMessagesOpen(false);
                             }}
                           >
-                            <AvatarImage src={currentInterlocutor.avatar_url} />
+                            <AvatarImage src={currentInterlocutor.avatar_url || undefined} />
                             <AvatarFallback className="bg-primary/20 text-primary">
                               {currentInterlocutor.full_name?.[0] || '?'}
                             </AvatarFallback>
@@ -2419,16 +2390,16 @@ const StudentPortfolio: React.FC = () => {
                         {currentInterlocutor ? (
                           <>
                             <Avatar className="w-16 h-16 mb-4">
-                              <AvatarImage src={currentInterlocutor.avatar_url} />
+                              <AvatarImage src={currentInterlocutor.avatar_url || undefined} />
                               <AvatarFallback className="bg-primary/20 text-primary text-xl">
-                                {currentInterlocutor.full_name[0]}
+                                {currentInterlocutor.full_name?.[0] || '?'}
                               </AvatarFallback>
                             </Avatar>
                             <p className="font-semibold text-base text-foreground">
-                              {currentInterlocutor.full_name}
+                              {currentInterlocutor.full_name || 'Utilisateur'}
                             </p>
                             <p className="text-sm text-muted-foreground mt-1">
-                              @{currentInterlocutor.username}
+                              @{currentInterlocutor.username || 'username'}
                             </p>
                             <p className="text-sm text-muted-foreground mt-4">Aucun message</p>
                             <p className="text-xs text-muted-foreground mt-1">Envoyez le premier message</p>
@@ -2459,7 +2430,7 @@ const StudentPortfolio: React.FC = () => {
                               >
                                 <p className="text-sm leading-relaxed">{msg.content}</p>
                                 <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
-                                  {formatMessageTime(new Date(msg.created_at))}
+                                  {formatMessageTime(new Date(msg.created_at || Date.now()))}
                                 </p>
                               </div>
                             </div>
@@ -2544,8 +2515,8 @@ const StudentPortfolio: React.FC = () => {
               <div className="space-y-2">
                 {availableUsers
                   .filter(u =>
-                    u.username.toLowerCase().includes(newConversationSearch.toLowerCase()) ||
-                    u.full_name.toLowerCase().includes(newConversationSearch.toLowerCase())
+                    (u.username || '').toLowerCase().includes(newConversationSearch.toLowerCase()) ||
+                    (u.full_name || '').toLowerCase().includes(newConversationSearch.toLowerCase())
                   )
                   .map((userProfile) => (
                     <button
@@ -2554,14 +2525,14 @@ const StudentPortfolio: React.FC = () => {
                       className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
                     >
                       <Avatar className="w-10 h-10">
-                        <AvatarImage src={userProfile.avatar_url} />
+                        <AvatarImage src={userProfile.avatar_url || undefined} />
                         <AvatarFallback className="bg-accent text-primary">
-                          {userProfile.full_name[0]}
+                          {userProfile.full_name?.[0] || '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{userProfile.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">@{userProfile.username}</p>
+                        <p className="font-semibold text-sm truncate">{userProfile.full_name || 'Utilisateur'}</p>
+                        <p className="text-xs text-muted-foreground truncate">@{userProfile.username || 'username'}</p>
                         {userProfile.course && (
                           <p className="text-xs text-muted-foreground">{userProfile.course}</p>
                         )}
@@ -2569,8 +2540,8 @@ const StudentPortfolio: React.FC = () => {
                     </button>
                   ))}
                 {availableUsers.filter(u =>
-                  u.username.toLowerCase().includes(newConversationSearch.toLowerCase()) ||
-                  u.full_name.toLowerCase().includes(newConversationSearch.toLowerCase())
+                  (u.username || '').toLowerCase().includes(newConversationSearch.toLowerCase()) ||
+                  (u.full_name || '').toLowerCase().includes(newConversationSearch.toLowerCase())
                 ).length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="text-sm">Aucun utilisateur trouvé</p>
@@ -2649,7 +2620,7 @@ const StudentPortfolio: React.FC = () => {
             {user ? (
               <div className="flex items-center gap-2">
                 <Avatar className="h-9 w-9 cursor-pointer ring-2 ring-border hover:ring-primary transition-all" onClick={() => setActiveTab('profile')}>
-                  <AvatarImage src={userProfile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`} />
+                  <AvatarImage src={userProfile?.avatar_url || (user ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}` : '')} />
                   <AvatarFallback className="bg-accent text-primary font-medium">{user.email?.[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <Button variant="ghost" size="icon" onClick={() => signOut()} className="rounded-full">
@@ -2676,7 +2647,7 @@ const StudentPortfolio: React.FC = () => {
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
               {/* 1. ADD STORY BUTTON - Always First (Static) */}
               {user && (() => {
-                const currentUserStories = groupedStories.find(g => g.user_id === user.id);
+                const currentUserStories = groupedStories.find(g => g.userId === user.id);
                 const hasOwnStories = !!currentUserStories;
 
                 return (
@@ -2756,9 +2727,9 @@ const StudentPortfolio: React.FC = () => {
               })()}
 
               {/* 2. OTHER USERS' STORIES - Dynamic Loop (excludes current user) */}
-              {groupedStories.filter(g => g.user_id !== user?.id).map((group, index) => (
+              {groupedStories.filter(g => g.userId !== user?.id).map((group, index) => (
                 <button
-                  key={group.user_id}
+                  key={group.userId}
                   onClick={() => handleOpenUserStories(group)}
                   className="flex flex-col items-center gap-2 flex-shrink-0 group"
                 >
@@ -2773,8 +2744,8 @@ const StudentPortfolio: React.FC = () => {
                     <div className={`story-ring ${index < 3 ? 'story-ring-unread' : ''} relative`}>
                       <div className="w-[68px] h-[68px] rounded-full bg-card p-0.5">
                         <Avatar className="w-full h-full">
-                          <AvatarImage src={group.profile.avatar_url} className="object-cover" />
-                          <AvatarFallback className="bg-accent text-primary font-medium">{group.profile.username[0]}</AvatarFallback>
+                          <AvatarImage src={group.profile.avatar_url || undefined} className="object-cover" />
+                          <AvatarFallback className="bg-accent text-primary font-medium">{group.profile.username?.[0] || '?'}</AvatarFallback>
                         </Avatar>
                       </div>
                     </div>
@@ -2785,7 +2756,7 @@ const StudentPortfolio: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <span className="text-xs max-w-[72px] truncate text-muted-foreground group-hover:text-foreground transition-colors font-medium">{group.profile.username}</span>
+                  <span className="text-xs max-w-[72px] truncate text-muted-foreground group-hover:text-foreground transition-colors font-medium">{group.profile.username || 'username'}</span>
                 </button>
               ))}
             </div>
@@ -2856,11 +2827,11 @@ const StudentPortfolio: React.FC = () => {
                   feedItemsTop.length > 0 ? (
                     <div className="space-y-4">
                       {feedItemsTop.map((item, index) => {
-                        const isReel = item.type === 'reel';
+                        const isReel = item.post_type === 'reel';
                         const itemId = item.id;
                         const itemPostOrReel: PostOrReel = isReel
-                          ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const }
-                          : item as ProjectPost;
+                          ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const } as unknown as PostOrReel
+                          : { ...item, post_type: 'post' as const } as unknown as PostOrReel;
 
                         return (
                           <Card key={`top-${itemId}`} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
@@ -2871,15 +2842,15 @@ const StudentPortfolio: React.FC = () => {
                                   className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
                                   onClick={() => setViewingUserId(item.user_id)}
                                 >
-                                  <AvatarImage src={item.profiles.avatar_url} />
-                                  <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
+                                  <AvatarImage src={item.profiles.avatar_url || undefined} />
+                                  <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name?.[0] || '?'}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <p
                                     className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                                     onClick={() => setViewingUserId(item.user_id)}
                                   >
-                                    {item.profiles.full_name}
+                                    {item.profiles.full_name || 'Utilisateur'}
                                   </p>
                                   <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                                 </div>
@@ -2989,9 +2960,9 @@ const StudentPortfolio: React.FC = () => {
                               </div>
 
                               <div className="space-y-2">
-                                <p className="font-semibold text-sm">{item.likes_count} likes</p>
+                                <p className="font-semibold text-sm">{item.likes_count || 0} likes</p>
                                 <p className="text-sm">
-                                  <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username}</span>{' '}
+                                  <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username || 'username'}</span>{' '}
                                   <span className="font-bold text-foreground">{item.title}</span>
                                 </p>
                                 <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
@@ -3005,14 +2976,14 @@ const StudentPortfolio: React.FC = () => {
                                   </div>
                                 )}
                                 {/* Comments Section */}
-                                {item.comments_count > 0 && (
+                                {(item.comments_count || 0) > 0 && (
                                   <>
                                     {!expandedComments[itemId] && postComments[itemId] && postComments[itemId].length > 0 && (
                                       <div className="space-y-2 mt-2">
                                         {postComments[itemId].slice(-2).map((comment) => (
                                           <div key={comment.id} className="flex gap-2">
                                             <p className="text-sm">
-                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username || 'username'}</span>{' '}
                                               <span className="text-foreground">{comment.text}</span>
                                             </p>
                                           </div>
@@ -3024,14 +2995,14 @@ const StudentPortfolio: React.FC = () => {
                                         {postComments[itemId].map((comment) => (
                                           <div key={comment.id} className="flex gap-2">
                                             <p className="text-sm">
-                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                              <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username || 'username'}</span>{' '}
                                               <span className="text-foreground">{comment.text}</span>
                                             </p>
                                           </div>
                                         ))}
                                       </div>
                                     )}
-                                    {!expandedComments[itemId] && item.comments_count > 2 && (
+                                    {!expandedComments[itemId] && (item.comments_count || 0) > 2 && (
                                       <button
                                         onClick={async () => {
                                           if (!expandedComments[itemId]) {
@@ -3043,7 +3014,7 @@ const StudentPortfolio: React.FC = () => {
                                         }}
                                         className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
                                       >
-                                        Voir tous les commentaires ({item.comments_count})
+                                        Voir tous les commentaires ({item.comments_count || 0})
                                       </button>
                                     )}
                                   </>
@@ -3068,11 +3039,11 @@ const StudentPortfolio: React.FC = () => {
                   /* Section Tous les posts */
                   <div className="space-y-4">
                     {feedItemsAll.map((item, index) => {
-                      const isReel = item.type === 'reel';
+                      const isReel = item.post_type === 'reel';
                       const itemId = item.id;
                       const itemPostOrReel: PostOrReel = isReel
-                        ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const }
-                        : item as ProjectPost;
+                        ? { ...item, images: [item.video_url], tags: [], post_type: 'reel' as const } as unknown as PostOrReel
+                        : { ...item, post_type: 'post' as const } as unknown as PostOrReel;
 
                       return (
                         <Card key={itemId} className={`feed-item overflow-hidden`} style={{ animationDelay: `${index * 50}ms` }}>
@@ -3083,15 +3054,15 @@ const StudentPortfolio: React.FC = () => {
                                 className="cursor-pointer ring-2 ring-transparent hover:ring-primary/30 transition-all"
                                 onClick={() => setViewingUserId(item.user_id)}
                               >
-                                <AvatarImage src={item.profiles.avatar_url} />
-                                <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name[0]}</AvatarFallback>
+                                <AvatarImage src={item.profiles.avatar_url || undefined} />
+                                <AvatarFallback className="bg-accent text-primary font-medium">{item.profiles.full_name?.[0] || '?'}</AvatarFallback>
                               </Avatar>
                               <div>
                                 <p
                                   className="font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                                   onClick={() => setViewingUserId(item.user_id)}
                                 >
-                                  {item.profiles.full_name}
+                                  {item.profiles.full_name || 'Utilisateur'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                               </div>
@@ -3203,7 +3174,7 @@ const StudentPortfolio: React.FC = () => {
                             <div className="space-y-2">
                               <p className="font-semibold text-sm">{item.likes_count} likes</p>
                               <p className="text-sm">
-                                <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username}</span>{' '}
+                                <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{item.profiles.username || 'username'}</span>{' '}
                                 <span className="font-bold text-foreground">{item.title}</span>
                               </p>
                               <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
@@ -3217,14 +3188,14 @@ const StudentPortfolio: React.FC = () => {
                                 </div>
                               )}
                               {/* Comments Section */}
-                              {item.comments_count > 0 && (
+                              {(item.comments_count || 0) > 0 && (
                                 <>
                                   {!expandedComments[itemId] && postComments[itemId] && postComments[itemId].length > 0 && (
                                     <div className="space-y-2 mt-2">
                                       {postComments[itemId].slice(-2).map((comment) => (
                                         <div key={comment.id} className="flex gap-2">
                                           <p className="text-sm">
-                                            <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                            <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username || 'username'}</span>{' '}
                                             <span className="text-foreground">{comment.text}</span>
                                           </p>
                                         </div>
@@ -3236,7 +3207,7 @@ const StudentPortfolio: React.FC = () => {
                                       {postComments[itemId].map((comment) => (
                                         <div key={comment.id} className="flex gap-2">
                                           <p className="text-sm">
-                                            <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username}</span>{' '}
+                                            <span className="font-semibold hover:text-primary cursor-pointer transition-colors">{comment.profiles.username || 'username'}</span>{' '}
                                             <span className="text-foreground">{comment.text}</span>
                                           </p>
                                         </div>
@@ -3254,7 +3225,7 @@ const StudentPortfolio: React.FC = () => {
                                     }}
                                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                                   >
-                                    {expandedComments[itemId] ? 'Hide comments' : `View all ${item.comments_count} comments`}
+                                    {expandedComments[itemId] ? 'Hide comments' : `View all ${item.comments_count || 0} comments`}
                                   </button>
                                 </>
                               )}
@@ -3291,7 +3262,7 @@ const StudentPortfolio: React.FC = () => {
                 <div
                   key={post.id}
                   className="aspect-square cursor-pointer relative group overflow-hidden"
-                  onClick={() => setSelectedPost(post)}
+                  onClick={() => setSelectedPost({ ...post, post_type: 'post' as const } as unknown as PostOrReel)}
                 >
                   <img
                     src={post.images[0]}
@@ -3453,28 +3424,29 @@ const StudentPortfolio: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">{posts.filter(p => p.user_id === user?.id).length}</p>
-                    <p className="text-xs text-muted-foreground">Projects</p>
-                  </div>
-                  <button
-                    onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'followers' })}
-                    className="text-center cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <p className="text-2xl font-bold text-foreground">{followersCount}</p>
-                    <p className="text-xs text-muted-foreground">Followers</p>
-                  </button>
-                  <button
-                    onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'following' })}
-                    className="text-center cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <p className="text-2xl font-bold text-foreground">{followingCount}</p>
-                    <p className="text-xs text-muted-foreground">Following</p>
-                  </button>
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-foreground">{posts.filter(p => p.user_id === user?.id).length}</p>
+                  <p className="text-xs text-muted-foreground">Projects</p>
                 </div>
+                <button
+                  onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'followers' })}
+                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <p className="text-2xl font-bold text-foreground">{followersCount}</p>
+                  <p className="text-xs text-muted-foreground">Followers</p>
+                </button>
+                <button
+                  onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'following' })}
+                  className="text-center cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <p className="text-2xl font-bold text-foreground">{followingCount}</p>
+                  <p className="text-xs text-muted-foreground">Following</p>
+                </button>
+              </div>
             </Card>
 
             {/* Profile Highlights Section */}
@@ -3505,7 +3477,7 @@ const StudentPortfolio: React.FC = () => {
                         <img
                           src={highlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'}
                           alt={highlight.title}
-                          className="w-full h-full rounded-full object-cover group-hover:scale-110 transition-transform duration-300"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                         />
                       </div>
                       {/* Story count badge */}
@@ -3525,8 +3497,8 @@ const StudentPortfolio: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 {/* Combine posts and reels */}
                 {[
-                  ...posts.filter(p => p.user_id === user?.id).map(p => ({ ...p, type: 'post' as const })),
-                  ...reels.filter(r => r.user_id === user?.id).map(r => ({ ...r, type: 'reel' as const, images: [r.video_url] }))
+                  ...posts.filter(p => p.user_id === user?.id).map(p => ({ ...p, post_type: 'post' as const })),
+                  ...reels.filter(r => r.user_id === user?.id).map(r => ({ ...r, post_type: 'reel' as const, images: [r.video_url], tags: [], description: r.description || '' }))
                 ]
                   .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                   .map((item) => (
@@ -3535,19 +3507,10 @@ const StudentPortfolio: React.FC = () => {
                       className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1"
                       onClick={() => {
                         // Convert to PostOrReel format for the dialog
-                        if (item.type === 'reel') {
-                          const reelItem: PostOrReel = {
-                            ...item,
-                            images: [item.video_url],
-                            tags: [],
-                          };
-                          setSelectedPost(reelItem);
-                        } else {
-                          setSelectedPost(item as ProjectPost);
-                        }
+                        setSelectedPost(item as unknown as PostOrReel);
                       }}
                     >
-                      {item.type === 'reel' && item.video_url ? (
+                      {item.post_type === 'reel' && item.video_url ? (
                         <video
                           src={item.video_url}
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -3558,7 +3521,7 @@ const StudentPortfolio: React.FC = () => {
                         <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                       )}
                       {/* Video indicator for reels */}
-                      {item.type === 'reel' && (
+                      {item.post_type === 'reel' && (
                         <div className="absolute top-2 right-2 z-10">
                           <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
                             <Video className="w-4 h-4 text-white" />
@@ -3612,20 +3575,11 @@ const StudentPortfolio: React.FC = () => {
                         key={item.id}
                         className="aspect-square rounded-[var(--radius-xl)] overflow-hidden relative group cursor-pointer shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-hover)] transition-all duration-300 hover:-translate-y-1"
                         onClick={() => {
-                          // Convert to PostOrReel format for the dialog
-                          if (item.type === 'reel') {
-                            const reelItem: PostOrReel = {
-                              ...item,
-                              images: [item.video_url],
-                              tags: [],
-                            };
-                            setSelectedPost(reelItem);
-                          } else {
-                            setSelectedPost(item as ProjectPost);
-                          }
+                          // Convert to PostOrReel format for the dialog if needed (item is already PostOrReel)
+                          setSelectedPost(item);
                         }}
                       >
-                        {item.type === 'reel' ? (
+                        {item.post_type === 'reel' ? (
                           <video
                             src={item.video_url}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -3636,7 +3590,7 @@ const StudentPortfolio: React.FC = () => {
                           <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         )}
                         {/* Video indicator for reels */}
-                        {item.type === 'reel' && (
+                        {item.post_type === 'reel' && (
                           <div className="absolute top-2 right-2 z-10">
                             <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
                               <Video className="w-4 h-4 text-white" />
@@ -3664,9 +3618,9 @@ const StudentPortfolio: React.FC = () => {
             )}
           </div>
         )}
+
       </main>
 
-      {/* Reels View - Full Screen */}
       {activeTab === 'reels' && (
         <div className="fixed inset-0 z-40 bg-black">
           {/* Reels Container with Snap Scroll */}
@@ -3699,7 +3653,7 @@ const StudentPortfolio: React.FC = () => {
                 </div>
               </div>
             ) : (
-              reels.map((reel, index) => (
+              reels.map((reel) => (
                 <div
                   key={reel.id}
                   ref={(el) => {
@@ -3744,14 +3698,14 @@ const StudentPortfolio: React.FC = () => {
                         className="w-10 h-10 ring-2 ring-white/20 cursor-pointer"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
-                        <AvatarImage src={reel.profiles.avatar_url} />
-                        <AvatarFallback>{reel.profiles.username[0]}</AvatarFallback>
+                        <AvatarImage src={reel.profiles.avatar_url || undefined} />
+                        <AvatarFallback>{reel.profiles.full_name?.[0] || '?'}</AvatarFallback>
                       </Avatar>
                       <span
                         className="text-white font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
                         onClick={() => setViewingUserId(reel.user_id)}
                       >
-                        @{reel.profiles.username}
+                        @{reel.profiles.username || 'unknown'}
                       </span>
                       {user && reel.user_id !== user.id && (
                         <Button
@@ -3786,7 +3740,7 @@ const StudentPortfolio: React.FC = () => {
                     )}
                     <div className="flex items-center gap-2 mt-2">
                       <Music className="w-3 h-3 text-white/60" />
-                      <span className="text-white/60 text-xs">Original Sound - {reel.profiles.username}</span>
+                      <span className="text-white/60 text-xs">Original Sound - {reel.profiles.username || 'unknown'}</span>
                     </div>
                   </div>
 
@@ -3800,7 +3754,7 @@ const StudentPortfolio: React.FC = () => {
                         <Heart className={`w-6 h-6 ${reel.liked_by_user ? 'text-[#ed3d66] fill-[#ed3d66]' : 'text-white'}`} />
                       </div>
                       <span className="text-white text-xs font-medium">
-                        {reel.likes_count > 0 ? (reel.likes_count > 1000 ? `${(reel.likes_count / 1000).toFixed(1)}K` : reel.likes_count) : ''}
+                        {(reel.likes_count || 0) > 0 ? ((reel.likes_count || 0) > 1000 ? `${((reel.likes_count || 0) / 1000).toFixed(1)}K` : (reel.likes_count || 0)) : ''}
                       </span>
                     </button>
                     <button className="flex flex-col items-center gap-1 group">
@@ -3808,7 +3762,7 @@ const StudentPortfolio: React.FC = () => {
                         <MessageCircle className="w-6 h-6 text-white" />
                       </div>
                       <span className="text-white text-xs font-medium">
-                        {reel.comments_count > 0 ? (reel.comments_count > 1000 ? `${(reel.comments_count / 1000).toFixed(1)}K` : reel.comments_count) : ''}
+                        {(reel.comments_count || 0) > 0 ? ((reel.comments_count || 0) > 1000 ? `${((reel.comments_count || 0) / 1000).toFixed(1)}K` : (reel.comments_count || 0)) : ''}
                       </span>
                     </button>
                     <button
@@ -4100,12 +4054,12 @@ const StudentPortfolio: React.FC = () => {
               <div className="p-5 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="ring-2 ring-accent">
-                    <AvatarImage src={selectedPost?.profiles.avatar_url} />
-                    <AvatarFallback className="bg-accent text-primary font-medium">{selectedPost?.profiles.full_name[0]}</AvatarFallback>
+                    <AvatarImage src={selectedPost?.profiles.avatar_url || undefined} />
+                    <AvatarFallback className="bg-accent text-primary font-medium">{selectedPost?.profiles.full_name?.[0] || '?'}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-sm">{selectedPost?.profiles.full_name}</p>
-                    <p className="text-xs text-muted-foreground">{selectedPost?.profiles.course}</p>
+                    <p className="font-semibold text-sm">{selectedPost?.profiles.full_name || 'Utilisateur'}</p>
+                    <p className="text-xs text-muted-foreground">{selectedPost?.profiles.course || 'Student'}</p>
                   </div>
                 </div>
               </div>
@@ -4136,14 +4090,14 @@ const StudentPortfolio: React.FC = () => {
                       {postComments[selectedPost.id].map((comment) => (
                         <div key={comment.id} className="flex gap-3">
                           <Avatar className="w-8 h-8 flex-shrink-0">
-                            <AvatarImage src={comment.profiles.avatar_url} />
+                            <AvatarImage src={comment.profiles.avatar_url || undefined} />
                             <AvatarFallback className="bg-accent text-primary text-xs">
-                              {comment.profiles.full_name[0]}
+                              {comment.profiles.full_name?.[0] || '?'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="bg-accent/50 rounded-lg p-2">
-                              <p className="text-sm font-semibold">{comment.profiles.username}</p>
+                              <p className="text-sm font-semibold">{comment.profiles.username || 'username'}</p>
                               <p className="text-sm text-foreground break-words">{comment.text}</p>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1 ml-2">
@@ -4188,7 +4142,7 @@ const StudentPortfolio: React.FC = () => {
                     <Bookmark className={`h-6 w-6 ${selectedPost?.saved_by_user ? 'fill-primary' : ''}`} />
                   </Button>
                 </div>
-                <p className="text-sm font-semibold mb-3">{selectedPost?.likes_count} likes</p>
+                <p className="font-semibold text-sm mb-3">{selectedPost?.likes_count} likes</p>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Add a comment..."
@@ -4259,14 +4213,14 @@ const StudentPortfolio: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="story-ring p-0.5">
                   <Avatar className="w-9 h-9 bg-card">
-                    <AvatarImage src={selectedUserStories.profile.avatar_url} />
+                    <AvatarImage src={selectedUserStories.profile.avatar_url || undefined} />
                     <AvatarFallback className="bg-accent text-primary text-sm font-medium">
-                      {selectedUserStories.profile.username[0]}
+                      {selectedUserStories.profile.username?.[0] || '?'}
                     </AvatarFallback>
                   </Avatar>
                 </div>
                 <div className="flex-1">
-                  <span className="text-white font-semibold text-sm block">{selectedUserStories.profile.username}</span>
+                  <span className="text-white font-semibold text-sm block">{selectedUserStories.profile.username || 'username'}</span>
                   <span className="text-white/60 text-xs">
                     {new Date(selectedUserStories.stories[currentStoryIndex]?.created_at).toLocaleDateString()}
                     {selectedUserStories.hasMultiple && (
@@ -4284,7 +4238,7 @@ const StudentPortfolio: React.FC = () => {
               <div className="w-full h-full relative">
                 {selectedUserStories.stories[currentStoryIndex].media_type === 'video' ||
                   (selectedUserStories.stories[currentStoryIndex].media_url &&
-                    selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].image_url) ? (
+                    selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].media_url) ? (
                   <video
                     ref={(video) => {
                       // Auto-unmute when video is ready (after user interaction with opening the story)
@@ -4297,7 +4251,7 @@ const StudentPortfolio: React.FC = () => {
                         });
                       }
                     }}
-                    src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
+                    src={selectedUserStories.stories[currentStoryIndex].media_url}
                     className="w-full h-full object-cover"
                     controls
                     autoPlay
@@ -4307,7 +4261,7 @@ const StudentPortfolio: React.FC = () => {
                   />
                 ) : (
                   <img
-                    src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
+                    src={selectedUserStories.stories[currentStoryIndex].media_url}
                     alt="Story"
                     className="w-full h-full object-cover"
                   />

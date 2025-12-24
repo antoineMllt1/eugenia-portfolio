@@ -15,27 +15,12 @@ interface PublicProfileDialogProps {
     onStartConversation?: (userId: string) => void
 }
 
-interface ProfileData {
-    id: string
-    username: string
-    full_name: string
-    avatar_url: string
-    bio?: string
-    course?: string
-    role?: string
-}
-
-interface ProjectPost {
-    id: string
-    title: string
-    images: string[]
-    likes_count: { count: number }[]
-}
+import type { StudentProfile } from '@/types'
 
 export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, onStartConversation }: PublicProfileDialogProps) {
     const { user } = useAuth()
-    const [profile, setProfile] = useState<ProfileData | null>(null)
-    const [projects, setProjects] = useState<ProjectPost[]>([])
+    const [profile, setProfile] = useState<StudentProfile | null>(null)
+    const [projects, setProjects] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [followersCount, setFollowersCount] = useState(0)
     const [followingCount, setFollowingCount] = useState(0)
@@ -63,7 +48,7 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
                 .single()
 
             if (profileError) throw profileError
-            setProfile(profileData)
+            setProfile(profileData as StudentProfile)
 
             // Fetch Projects
             const { data: projectsData, error: projectsError } = await supabase
@@ -194,7 +179,7 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
                             {/* Header */}
                             <div className="flex items-start gap-6">
                                 <Avatar className="w-24 h-24 border-2 border-primary/10">
-                                    <AvatarImage src={profile?.avatar_url} />
+                                    <AvatarImage src={profile?.avatar_url || undefined} />
                                     <AvatarFallback>{profile?.full_name?.[0]}</AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 space-y-2">
