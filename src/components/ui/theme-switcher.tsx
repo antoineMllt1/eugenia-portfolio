@@ -46,6 +46,16 @@ const ThemeSwitcher: React.FC = () => {
   const [isOpen, setIsOpen] = React.useState(false)
   const dropdownRef = React.useRef<HTMLDivElement>(null)
 
+  const applyTheme = (theme: Theme) => {
+    document.documentElement.setAttribute("data-theme", theme)
+    // Also add/remove dark class for Tailwind dark mode compatibility
+    if (theme === "dark" || theme === "eugenia" || theme === "albert") {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
+  }
+
   // Load theme from localStorage on mount
   React.useEffect(() => {
     const savedTheme = localStorage.getItem("eugenia-theme") as Theme | null
@@ -72,16 +82,6 @@ const ThemeSwitcher: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
-
-  const applyTheme = (theme: Theme) => {
-    document.documentElement.setAttribute("data-theme", theme)
-    // Also add/remove dark class for Tailwind dark mode compatibility
-    if (theme === "dark" || theme === "eugenia" || theme === "albert") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }
 
   const handleThemeChange = (theme: Theme) => {
     setCurrentTheme(theme)
@@ -156,8 +156,8 @@ const ThemeSwitcher: React.FC = () => {
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
                     "focus:outline-none focus:ring-2 focus:ring-primary/20",
-                    isActive 
-                      ? "bg-accent text-foreground" 
+                    isActive
+                      ? "bg-accent text-foreground"
                       : "hover:bg-accent/50 text-foreground"
                   )}
                   whileHover={{ x: 2 }}

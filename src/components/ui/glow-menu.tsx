@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 
 interface MenuItem {
+    id?: string
     icon: LucideIcon | React.FC
     label: string
     href: string
@@ -82,12 +83,12 @@ export const MenuBar = React.forwardRef<any, MenuBarProps>(
                 <ul className="flex items-center gap-1 relative z-10">
                     {items.map((item) => {
                         const Icon = item.icon
-                        const isActive = item.label === activeItem
+                        const isActive = (item.id || item.label) === activeItem
 
                         return (
                             <motion.li key={item.label} className="relative">
                                 <button
-                                    onClick={() => onItemClick?.(item.label)}
+                                    onClick={() => onItemClick?.(item.id || item.label)}
                                     className="block w-full"
                                 >
                                     <motion.div

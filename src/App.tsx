@@ -4086,19 +4086,18 @@ const StudentPortfolio: React.FC = () => {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
         <MenuBar
           items={[
-            { icon: Home, label: t('navigation.home'), href: '#' },
-            { icon: Search, label: t('navigation.search'), href: '#' },
-            { icon: Clapperboard, label: t('navigation.reels'), href: '#' },
-            { icon: SquarePlus, label: t('navigation.create'), href: '#' },
-            { icon: UserIcon, label: t('navigation.profile'), href: '#' },
+            { id: 'home', icon: Home, label: t('navigation.home'), href: '#' },
+            { id: 'search', icon: Search, label: t('navigation.search'), href: '#' },
+            { id: 'reels', icon: Clapperboard, label: t('navigation.reels'), href: '#' },
+            { id: 'create', icon: SquarePlus, label: t('navigation.create'), href: '#' },
+            { id: 'profile', icon: UserIcon, label: t('navigation.profile'), href: '#' },
           ]}
-          activeItem={activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-          onItemClick={(item) => {
-            const tab = item.toLowerCase();
-            if (tab === 'create') {
+          activeItem={activeTab}
+          onItemClick={(id) => {
+            if (id === 'create') {
               setShowCreateChoice(true);
             } else {
-              setActiveTab(tab as any);
+              setActiveTab(id as any);
             }
           }}
         />

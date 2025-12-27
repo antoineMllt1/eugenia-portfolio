@@ -8,7 +8,7 @@ interface AuthContextType {
     session: Session | null
     loading: boolean
     signOut: () => Promise<void>
-    changeLanguage: (lang: string) => Promise<void>
+    changeLanguage: (lang: string, userId?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // If not in profiles, check user_metadata
             const { data: { user } } = await supabase.auth.getUser()
             const userLanguage = user?.user_metadata?.language
-            
+
             if (userLanguage && ['fr', 'en', 'es', 'de', 'it'].includes(userLanguage)) {
                 i18n.changeLanguage(userLanguage)
                 return
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // If no language set, detect from browser and save it
             const browserLang = navigator.language.split('-')[0]
             const detectedLang = ['fr', 'en', 'es', 'de', 'it'].includes(browserLang) ? browserLang : 'fr'
-            
+
             // Save detected language
             await changeLanguage(detectedLang, userId)
         } catch (error) {
@@ -110,37 +110,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Wrap in try-catch to prevent crashes
         try {
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            
-            // Load user language preference if user is logged in
-            if (session?.user?.id) {
-                await loadUserLanguage(session.user.id)
-            }
-            
-            setLoading(false)
+            supabase.auth.getSession().then(async ({ data: { session } }) => {
+                setSession(session)
+                setUser(session?.user ?? null)
+
+                // Load user language preference if user is logged in
+                if (session?.user?.id) {
+                    await loadUserLanguage(session.user.id)
+                }
+
+                setLoading(false)
                 clearTimeout(timeoutId)
             }).catch((error) => {
                 console.error('Error getting session:', error)
                 setLoading(false)
                 clearTimeout(timeoutId)
-        })
+            })
 
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            
-            // Load user language preference if user is logged in
-            if (session?.user?.id) {
-                await loadUserLanguage(session.user.id)
-            }
-            
-            setLoading(false)
+            const {
+                data: { subscription },
+            } = supabase.auth.onAuthStateChange(async (_event, session) => {
+                setSession(session)
+                setUser(session?.user ?? null)
+
+                // Load user language preference if user is logged in
+                if (session?.user?.id) {
+                    await loadUserLanguage(session.user.id)
+                }
+
+                setLoading(false)
                 clearTimeout(timeoutId)
-        })
+            })
 
             return () => {
                 clearTimeout(timeoutId)
