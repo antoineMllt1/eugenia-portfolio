@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox'
-import { Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const CLASS_OPTIONS = [
     { value: 'B1 Albert', label: 'B1 Albert' },
@@ -28,6 +28,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
 
     // Form state
     const [email, setEmail] = useState('')
@@ -103,18 +104,18 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>
-                        {isForgotPassword 
-                            ? 'Réinitialiser le mot de passe' 
-                            : isLogin 
-                            ? 'Welcome Back' 
-                            : 'Create Account'}
+                        {isForgotPassword
+                            ? 'Réinitialiser le mot de passe'
+                            : isLogin
+                                ? 'Welcome Back'
+                                : 'Create Account'}
                     </DialogTitle>
                     <DialogDescription>
                         {isForgotPassword
                             ? 'Entrez votre adresse email pour recevoir un lien de réinitialisation'
                             : isLogin
-                            ? 'Enter your credentials to access your account'
-                            : 'Join the community to share your projects'}
+                                ? 'Enter your credentials to access your account'
+                                : 'Join the community to share your projects'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -163,13 +164,27 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
 
                     {!isForgotPassword && (
                         <div className="space-y-2">
-                            <Input
-                                type="password"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required={!isForgotPassword}
-                            />
+                            <div className="relative">
+                                <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required={!isForgotPassword}
+                                    className="pr-10"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                        <Eye className="h-4 w-4" />
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -188,11 +203,11 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                     <div className="flex flex-col gap-2 pt-2">
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isForgotPassword 
-                                ? 'Envoyer l\'email de réinitialisation' 
-                                : isLogin 
-                                ? 'Sign In' 
-                                : 'Sign Up'}
+                            {isForgotPassword
+                                ? 'Envoyer l\'email de réinitialisation'
+                                : isLogin
+                                    ? 'Sign In'
+                                    : 'Sign Up'}
                         </Button>
 
                         {isForgotPassword ? (
