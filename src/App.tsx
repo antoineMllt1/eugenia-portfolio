@@ -19,6 +19,7 @@ import { PublicProfileDialog } from './components/profile/PublicProfileDialog';
 import { FollowersFollowingDialog } from '@/components/profile/FollowersFollowingDialog';
 import { CreateStoryDialog } from './components/story/CreateStoryDialog';
 import { CreateReelDialog } from './components/reel/CreateReelDialog';
+import { UpdatePasswordDialog } from '@/components/auth/UpdatePasswordDialog';
 import { Shield } from 'lucide-react';
 import type {
   StudentProfile,
@@ -53,13 +54,14 @@ interface ChatMessage {
 
 // Main Component
 const StudentPortfolio: React.FC = () => {
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut, isRecoveryMode } = useAuth();
   const [posts, setPosts] = useState<ProjectPost[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
   const [stories, setStories] = useState<StoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [showUpdatePassword, setShowUpdatePassword] = useState(false);
   const [selectedUserStories, setSelectedUserStories] = useState<GroupedUserStories | null>(null);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<PostOrReel | null>(null);
@@ -346,6 +348,13 @@ const StudentPortfolio: React.FC = () => {
     setSelectedUserStories(null);
     setCurrentStoryIndex(0);
   };
+
+  // Handle recovery mode
+  useEffect(() => {
+    if (isRecoveryMode) {
+      setShowUpdatePassword(true);
+    }
+  }, [isRecoveryMode]);
 
   // Navigate to next story
   const handleNextStory = () => {
@@ -2167,6 +2176,10 @@ const StudentPortfolio: React.FC = () => {
     <div className="min-h-screen flex flex-col relative overflow-hidden w-full pb-24 bg-background">
 
       <AuthDialog isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      <UpdatePasswordDialog
+        isOpen={showUpdatePassword}
+        onClose={() => setShowUpdatePassword(false)}
+      />
       <EditProfileDialog
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}
@@ -3650,9 +3663,9 @@ const StudentPortfolio: React.FC = () => {
                   <AvatarFallback className="bg-accent text-primary text-2xl font-bold">{userProfile?.full_name?.[0] || 'ME'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-foreground">{userProfile?.full_name || user?.user_metadata?.full_name || 'Guest'}</h2>
+                  <h2 className="text-2xl font-bold text-foreground">{userProfile?.full_name || user?.user_metadata?.full_name || 'Étudiant'}</h2>
                   <p className="text-sm text-muted-foreground">@{userProfile?.username || user?.user_metadata?.username || 'guest'}</p>
-                  <p className="text-sm mt-1 font-semibold text-primary">{userProfile?.course || 'Student'}</p>
+                  <p className="text-sm mt-1 font-semibold text-primary">{userProfile?.course || 'Étudiant'}</p>
                   {userProfile?.bio && <p className="text-sm mt-3 text-muted-foreground leading-relaxed">{userProfile.bio}</p>}
 
                   {/* Social Links */}
@@ -3686,7 +3699,7 @@ const StudentPortfolio: React.FC = () => {
                   {user && (
                     <div className="flex gap-2 mt-4">
                       <Button variant="outline" onClick={() => setIsEditProfileOpen(true)}>
-                        Edit Profile
+                        Modifier le profil
                       </Button>
                       {userProfile?.role === 'admin' && (
                         <Button
@@ -3707,21 +3720,21 @@ const StudentPortfolio: React.FC = () => {
               <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-foreground">{posts.filter(p => p.user_id === user?.id).length}</p>
-                  <p className="text-xs text-muted-foreground">Projects</p>
+                  <p className="text-xs text-muted-foreground">Projets</p>
                 </div>
                 <button
                   onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'followers' })}
                   className="text-center cursor-pointer hover:opacity-80 transition-opacity"
                 >
                   <p className="text-2xl font-bold text-foreground">{followersCount}</p>
-                  <p className="text-xs text-muted-foreground">Followers</p>
+                  <p className="text-xs text-muted-foreground">Abonnés</p>
                 </button>
                 <button
                   onClick={() => user && setFollowersFollowingDialog({ isOpen: true, type: 'following' })}
                   className="text-center cursor-pointer hover:opacity-80 transition-opacity"
                 >
                   <p className="text-2xl font-bold text-foreground">{followingCount}</p>
-                  <p className="text-xs text-muted-foreground">Following</p>
+                  <p className="text-xs text-muted-foreground">Abonnements</p>
                 </button>
               </div>
             </Card>

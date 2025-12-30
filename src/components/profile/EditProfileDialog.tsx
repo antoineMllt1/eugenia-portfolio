@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea' // We might need to create this or use Input
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox'
-import { Loader2, Upload, Github, Linkedin, Sparkles, User } from 'lucide-react'
+import { Loader2, Upload, Github, Linkedin, Sparkles, User, Eye, EyeOff } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 // Reusing class options from AuthDialog - ideally this should be in a shared constant file
@@ -56,6 +56,11 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [githubUrl, setGithubUrl] = useState('')
     const [linkedinUrl, setLinkedinUrl] = useState('')
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [passwordError, setPasswordError] = useState<string | null>(null)
+    const [passwordSuccess, setPasswordSuccess] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
 
     // Highlights state
     const [highlights, setHighlights] = useState<Highlight[]>([])
@@ -271,6 +276,24 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                 updated_at: new Date().toISOString(),
             }
 
+            // 3. Update password if provided
+            if (newPassword) {
+                if (newPassword !== confirmPassword) {
+                    setPasswordError('Les mots de passe ne correspondent pas.')
+                    setLoading(false)
+                    return
+                }
+
+                const { error: passwordUpdateError } = await supabase.auth.updateUser({
+                    password: newPassword
+                })
+
+                if (passwordUpdateError) throw passwordUpdateError
+                setPasswordSuccess(true)
+                setNewPassword('')
+                setConfirmPassword('')
+            }
+
             const { error: updateError } = await supabase
                 .from('profiles')
                 .upsert(profileData)
@@ -278,12 +301,14 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             if (updateError) throw updateError
 
             onProfileUpdate()
-            onClose()
+            if (!newPassword) onClose()
         } catch (error: any) {
             console.error('Error updating profile:', error)
             alert(`Failed to update profile: ${error.message || 'Unknown error'}`)
         } finally {
             setLoading(false)
+            setTimeout(() => setPasswordSuccess(false), 3000)
+            setTimeout(() => setPasswordError(null), 3000)
         }
     }
 
@@ -292,9 +317,9 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
                 {/* Fixed Header */}
                 <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
-                    <DialogTitle>Edit Profile</DialogTitle>
+                    <DialogTitle>Modifier le profil</DialogTitle>
                     <DialogDescription>
-                        Update your profile information visible to others.
+                        Mettez à jour vos informations personnelles visibles par les autres.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -347,31 +372,31 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                     />
                                     <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}>
                                         <Upload className="w-4 h-4 mr-2" />
-                                        Change Photo
+                                        Changer la photo
                                     </Button>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Full Name</label>
+                                <label className="text-sm font-medium">Nom complet</label>
                                 <Input
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
-                                    placeholder="Your Name"
+                                    placeholder="Votre Nom"
                                     required
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Class</label>
+                                <label className="text-sm font-medium">Classe / Promo</label>
                                 <MultiSelectCombobox
-                                    label="Class"
+                                    label="Classe"
                                     options={CLASS_OPTIONS}
                                     value={selectedClass}
                                     onChange={(val) => setSelectedClass(val.slice(-1))}
                                     renderItem={(option) => option.label}
                                     renderSelectedItem={(val) => val[0]}
-                                    placeholder="Select your class..."
+                                    placeholder="Sélectionnez votre classe..."
                                 />
                             </div>
 
@@ -390,7 +415,7 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                     <span className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
                                         🔗
                                     </span>
-                                    Professional Links
+                                    Liens professionnels
                                 </p>
 
                                 <div className="space-y-2">
@@ -419,14 +444,76 @@ export function EditProfileDialog({ isOpen, onClose, profile, user, onProfileUpd
                                     />
                                 </div>
                             </div>
+
+                            {/* Password Section */}
+                            <div className="space-y-4 pt-4 border-t border-border pb-6">
+                                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full bg-accent flex items-center justify-center">
+                                        🔒
+                                    </span>
+                                    Sécurité
+                                </p>
+
+                                {passwordSuccess && (
+                                    <div className="text-sm text-green-600 bg-green-50 p-2 rounded border border-green-200">
+                                        Mot de passe mis à jour avec succès !
+                                    </div>
+                                )}
+
+                                {passwordError && (
+                                    <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                                        {passwordError}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Nouveau mot de passe</label>
+                                    <div className="relative">
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="Laissez vide pour ne pas changer"
+                                            className="pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Confirmer le mot de passe</label>
+                                    <div className="relative">
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Confirmez le nouveau mot de passe"
+                                            className="pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Fixed Footer */}
                         <div className="flex justify-end gap-2 px-6 py-4 border-t border-border bg-card flex-shrink-0">
-                            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+                            <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
                             <Button type="submit" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
+                                Enregistrer
                             </Button>
                         </div>
                     </form>

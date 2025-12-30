@@ -6,6 +6,7 @@ interface AuthContextType {
     user: User | null
     session: Session | null
     loading: boolean
+    isRecoveryMode: boolean
     signOut: () => Promise<void>
 }
 
@@ -15,34 +16,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
+    const [isRecoveryMode, setIsRecoveryMode] = useState(false)
 
     useEffect(() => {
-        // Safety timeout - always set loading to false after 3 seconds max
         const timeoutId = setTimeout(() => {
             setLoading(false)
         }, 3000)
 
-        // Wrap in try-catch to prevent crashes
+        // Check handle recovery in URL before session check
+        if (window.location.hash && window.location.hash.includes('type=recovery')) {
+            setIsRecoveryMode(true)
+        }
+
         try {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            setLoading(false)
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                setSession(session)
+                setUser(session?.user ?? null)
+                setLoading(false)
                 clearTimeout(timeoutId)
             }).catch((error) => {
                 console.error('Error getting session:', error)
                 setLoading(false)
                 clearTimeout(timeoutId)
-        })
+            })
 
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            setLoading(false)
+            const {
+                data: { subscription },
+            } = supabase.auth.onAuthStateChange((event, session) => {
+                setSession(session)
+                setUser(session?.user ?? null)
+
+                if (event === 'PASSWORD_RECOVERY') {
+                    setIsRecoveryMode(true)
+                }
+
+                setLoading(false)
                 clearTimeout(timeoutId)
-        })
+            })
 
             return () => {
                 clearTimeout(timeoutId)
@@ -58,11 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [])
 
     const signOut = async () => {
+        setIsRecoveryMode(false)
         await supabase.auth.signOut()
     }
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, isRecoveryMode, signOut }}>
             {children}
         </AuthContext.Provider>
     )

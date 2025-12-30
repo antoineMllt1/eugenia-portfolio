@@ -46,7 +46,7 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
         try {
             if (isForgotPassword) {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/reset-password`,
+                    redirectTo: `${window.location.origin}`,
                 })
                 if (error) throw error
                 setSuccessMessage('Un email de réinitialisation a été envoyé à votre adresse email.')
