@@ -24,12 +24,12 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
             const file = e.target.files[0]
             const isVideo = file.type.startsWith('video/')
             const isImage = file.type.startsWith('image/')
-            
+
             if (!isVideo && !isImage) {
                 alert('Veuillez sélectionner une image ou une vidéo')
                 return
             }
-            
+
             setMediaFile(file)
             setMediaType(isVideo ? 'video' : 'image')
             setPreviewUrl(URL.createObjectURL(file))
@@ -63,7 +63,7 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                     user_id: user.id,
                     image_url: publicUrl, // Keep for backward compatibility
                     media_url: publicUrl, // New field for both images and videos
-                    media_type: mediaType, // 'image' or 'video'
+                    media_type: mediaType!, // 'image' or 'video'
                     title: title || null,
                     created_at: new Date().toISOString(),
                     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
@@ -107,8 +107,8 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                         {previewUrl ? (
                             <div className="relative w-full max-w-[280px] mx-auto aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-lg">
                                 {mediaType === 'video' ? (
-                                    <video 
-                                        src={previewUrl} 
+                                    <video
+                                        src={previewUrl}
                                         className="w-full h-full object-cover"
                                         controls
                                         muted

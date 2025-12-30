@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info } from 'lucide-react';
 import { MenuBar } from '@/components/ui/glow-menu';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { ScrollingLogo } from '@/components/ui/scrolling-logo';
@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { supabase } from '@/lib/supabase';
 import { EditProfileDialog } from './components/profile/EditProfileDialog';
 import { PublicProfileDialog } from './components/profile/PublicProfileDialog';
-import { FollowersFollowingDialog } from './components/profile/FollowersFollowingDialog';
+import { FollowersFollowingDialog } from '@/components/profile/FollowersFollowingDialog';
 import { CreateStoryDialog } from './components/story/CreateStoryDialog';
 import { CreateReelDialog } from './components/reel/CreateReelDialog';
 import { Shield } from 'lucide-react';
@@ -64,8 +65,8 @@ const StudentPortfolio: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<PostOrReel | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'reels' | 'create' | 'profile' | 'admin'>('home');
+  const [createType, setCreateType] = useState<'selection' | 'post' | 'reel'>('selection');
   const [homeFeedTab, setHomeFeedTab] = useState<'trending' | 'all'>('trending'); // Onglet actif dans Home
-  const [showCreateChoice, setShowCreateChoice] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
   const reelVideoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -301,6 +302,7 @@ const StudentPortfolio: React.FC = () => {
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostDesc, setNewPostDesc] = useState('');
   const [newPostTags, setNewPostTags] = useState('');
+  const [newPostCategory, setNewPostCategory] = useState('Général');
   const [newPostImage, setNewPostImage] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -385,7 +387,9 @@ const StudentPortfolio: React.FC = () => {
       fetchHighlights();
       fetchUserArchivedStories();
       fetchSavedPosts();
-    } else {
+    }
+    fetchAvailableUsers();
+    if (!user) {
       // Clear highlights and archived stories when user logs out
       setProfileHighlights([]);
       setUserArchivedStories([]);
@@ -1172,14 +1176,20 @@ const StudentPortfolio: React.FC = () => {
   };
 
   const fetchAvailableUsers = useCallback(async () => {
-    if (!user) return;
+    // Guests should also be able to search for students
+    // if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, username, full_name, avatar_url, course')
-        .neq('id', user.id)
         .order('full_name', { ascending: true });
+
+      if (user) {
+        query = query.neq('id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -2050,6 +2060,7 @@ const StudentPortfolio: React.FC = () => {
         description: newPostDesc,
         images: [publicUrl],
         tags: newPostTags.split(',').map(t => t.trim()),
+        category: newPostCategory,
       });
 
       if (dbError) throw dbError;
@@ -2072,12 +2083,22 @@ const StudentPortfolio: React.FC = () => {
   const filteredPosts = posts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (post.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (post.profiles?.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (post.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredReels = reels.filter(reel =>
     reel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (reel.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (reel.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (reel.profiles?.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (reel.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUsers = availableUsers.filter(u =>
+    (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.course || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate interaction score (likes + comments + saves)
@@ -2157,6 +2178,7 @@ const StudentPortfolio: React.FC = () => {
         }}
       />
       <PublicProfileDialog
+        key={viewingUserId || 'none'}
         userId={viewingUserId}
         isOpen={!!viewingUserId}
         onClose={() => setViewingUserId(null)}
@@ -2171,6 +2193,12 @@ const StudentPortfolio: React.FC = () => {
           setViewingUserId(null); // Close profile dialog
           await handleStartNewConversation(targetUserId);
           setIsMessagesOpen(true); // Open messages dialog
+        }}
+        onViewProfile={(userId) => {
+          setViewingUserId(userId);
+        }}
+        onProjectClick={(project) => {
+          setSelectedPost(project);
         }}
       />
       <Dialog open={isMessagesOpen} onOpenChange={setIsMessagesOpen}>
@@ -2563,6 +2591,14 @@ const StudentPortfolio: React.FC = () => {
             if (user) {
               fetchFollowCounts(user.id);
             }
+          }}
+          onUserClick={(clickedUserId: string) => {
+            setFollowersFollowingDialog(prev => ({ ...prev, isOpen: false }));
+            if (clickedUserId === user.id) {
+              setActiveTab('profile');
+              return;
+            }
+            setViewingUserId(clickedUserId);
           }}
         />
       )}
@@ -3243,117 +3279,358 @@ const StudentPortfolio: React.FC = () => {
         )}
 
         {activeTab === 'search' && (
-          <div className="space-y-6 animate-fade-up">
+          <div className="space-y-6 animate-fade-up min-h-[calc(100vh-200px)]">
             <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Explore</h2>
-              <p className="text-sm text-muted-foreground">Discover amazing student projects</p>
+              <h2 className="text-2xl font-bold text-foreground mb-1">Explorer</h2>
+              <p className="text-sm text-muted-foreground">Découvrez des projets et des étudiants</p>
             </div>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search projects, students, tags..."
+                placeholder="Rechercher des projets, étudiants, tags..."
                 value={searchQuery}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-12 h-12 rounded-full bg-muted border-0 focus:ring-2 focus:ring-primary/20"
               />
             </div>
-            <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className="aspect-square cursor-pointer relative group overflow-hidden"
-                  onClick={() => setSelectedPost({ ...post, post_type: 'post' as const } as unknown as PostOrReel)}
-                >
-                  <img
-                    src={post.images[0]}
-                    alt={post.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                    <div className="flex items-center gap-3 text-white text-sm">
-                      <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes_count}</span>
-                      <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {post.comments_count}</span>
-                    </div>
+
+            {(!searchQuery) ? (
+              <div className="space-y-8 pb-8">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                    Étudiants à découvrir
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(availableUsers || []).slice(0, 10).map((u) => (
+                      <div
+                        key={u.id}
+                        className="flex items-center gap-3 p-3 rounded-[var(--radius-xl)] bg-card border border-border/50 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group"
+                        onClick={() => setViewingUserId(u.id)}
+                      >
+                        <Avatar className="w-12 h-12 border-2 border-primary/10 group-hover:border-primary/30 transition-colors">
+                          <AvatarImage src={u.avatar_url || undefined} />
+                          <AvatarFallback>{u.full_name?.[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{u.full_name}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                          {u.course && (
+                            <p className="text-[10px] text-primary/80 mt-0.5 font-medium">{u.course}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-8 pb-8">
+                {/* Section Étudiants */}
+                {filteredUsers.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <GraduationCap className="w-5 h-5 text-primary" />
+                      Étudiants
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {filteredUsers.map((u) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-3 p-3 rounded-[var(--radius-xl)] bg-card border border-border/50 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group"
+                          onClick={() => setViewingUserId(u.id)}
+                        >
+                          <Avatar className="w-12 h-12 border-2 border-primary/10 group-hover:border-primary/30 transition-colors">
+                            <AvatarImage src={u.avatar_url || undefined} />
+                            <AvatarFallback>{u.full_name?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">{u.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                            {u.course && (
+                              <p className="text-[10px] text-primary/80 mt-0.5 font-medium">{u.course}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Projets */}
+                {filteredPosts.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-primary" />
+                      Projets
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {filteredPosts.map((post) => (
+                        <div
+                          key={post.id}
+                          className="aspect-square cursor-pointer relative group overflow-hidden rounded-[var(--radius-lg)] border border-border/50"
+                          onClick={() => setSelectedPost({ ...post, post_type: 'post' as const } as unknown as PostOrReel)}
+                        >
+                          <img
+                            src={post.images[0]}
+                            alt={post.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="flex items-center gap-3 text-white text-sm">
+                              <span className="flex items-center gap-1 font-bold"><Heart className="w-4 h-4 fill-white" /> {post.likes_count}</span>
+                              <span className="flex items-center gap-1 font-bold"><MessageCircle className="w-4 h-4 fill-white" /> {post.comments_count}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section Reels */}
+                {filteredReels.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                      <Video className="w-5 h-5 text-primary" />
+                      Reels
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {filteredReels.map((reel) => (
+                        <div
+                          key={reel.id}
+                          className="aspect-[9/16] cursor-pointer relative group overflow-hidden rounded-[var(--radius-lg)] bg-muted border border-border/50 shadow-sm"
+                          onClick={() => setSelectedPost({ ...reel, images: [reel.video_url], tags: [], post_type: 'reel' as const, description: reel.description || '' } as any)}
+                        >
+                          <video
+                            src={reel.video_url}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            muted
+                          />
+                          <div className="absolute top-2 right-2">
+                            <Video className="w-4 h-4 text-white drop-shadow-md" />
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <div className="flex items-center gap-3 text-white text-sm">
+                              <span className="flex items-center gap-1 font-bold"><Heart className="w-4 h-4 fill-white" /> {reel.likes_count}</span>
+                              <span className="flex items-center gap-1 font-bold"><MessageCircle className="w-4 h-4 fill-white" /> {reel.comments_count}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {filteredUsers.length === 0 && filteredPosts.length === 0 && filteredReels.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">Aucun résultat trouvé pour "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!searchQuery && (
+              <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
+                {posts.slice(0, 12).map((post) => (
+                  <div
+                    key={post.id}
+                    className="aspect-square cursor-pointer relative group overflow-hidden"
+                    onClick={() => setSelectedPost({ ...post, post_type: 'post' as const } as unknown as PostOrReel)}
+                  >
+                    <img
+                      src={post.images[0]}
+                      alt={post.title}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                      <div className="flex items-center gap-3 text-white text-sm">
+                        <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes_count}</span>
+                        <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {post.comments_count}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'create' && (
-          <div className="space-y-6 animate-fade-up">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Share Your Project</h2>
-              <p className="text-sm text-muted-foreground">Showcase your work to the Eugenia community</p>
+          <div className="space-y-8 animate-fade-up min-h-[calc(100vh-200px)] max-w-5xl mx-auto px-4">
+            <div className="pb-4 border-b border-border">
+              <h2 className="text-3xl font-bold text-foreground">Créer</h2>
+              <p className="text-muted-foreground">Partagez votre créativité avec la communauté Eugenia</p>
             </div>
+
             {!user ? (
-              <Card className="p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent flex items-center justify-center">
-                  <LogIn className="w-8 h-8 text-primary" />
+              <Card className="p-12 text-center max-w-lg mx-auto mt-12">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent flex items-center justify-center">
+                  <LogIn className="w-10 h-10 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
-                <p className="text-muted-foreground text-sm mb-4">You need to sign in to create a project.</p>
-                <Button variant="brand" onClick={() => setAuthOpen(true)}>Sign In</Button>
+                <h3 className="text-xl font-bold mb-2">Connexion requise</h3>
+                <p className="text-muted-foreground mb-6">Vous devez être connecté pour créer un projet ou un reel.</p>
+                <Button onClick={() => setAuthOpen(true)} size="lg" className="rounded-full px-8">
+                  Se connecter
+                </Button>
               </Card>
-            ) : (
-              <Card className="p-6">
-                <form onSubmit={handleCreatePost} className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Project Title</label>
-                    <Input
-                      value={newPostTitle}
-                      onChange={(e) => setNewPostTitle(e.target.value)}
-                      placeholder="My Awesome Project"
-                      className="h-12"
-                      required
-                    />
+            ) : createType === 'selection' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 px-4">
+                <Card
+                  className="p-8 hover:border-primary/50 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden h-[350px] flex flex-col items-center justify-center text-center space-y-6"
+                  onClick={() => setCreateType('post')}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-500">
+                    <ImageIcon className="w-10 h-10 text-primary" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Description</label>
-                    <Input
-                      value={newPostDesc}
-                      onChange={(e) => setNewPostDesc(e.target.value)}
-                      placeholder="Tell us about your project..."
-                      className="h-12"
-                      required
-                    />
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">Projet Portfolio</h3>
+                    <p className="text-muted-foreground text-sm max-w-xs mx-auto">Présentez vos travaux académiques avec des images et des descriptions détaillées.</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Tags</label>
-                    <Input
-                      value={newPostTags}
-                      onChange={(e) => setNewPostTags(e.target.value)}
-                      placeholder="react, ai, design (comma separated)"
-                      className="h-12"
-                    />
+                  <Button variant="ghost" className="font-bold text-primary group-hover:translate-x-1 transition-transform">
+                    Continuer <ChevronRight className="ml-1 w-4 h-4" />
+                  </Button>
+                </Card>
+
+                <Card
+                  className="p-8 hover:border-primary/50 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden h-[350px] flex flex-col items-center justify-center text-center space-y-6"
+                  onClick={() => setCreateType('reel')}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#ed3d66]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-500">
+                    <Video className="w-10 h-10 text-primary" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Project Image</label>
-                    <div className="border-2 border-dashed border-border rounded-[var(--radius-xl)] p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">Vidéo Reel</h3>
+                    <p className="text-muted-foreground text-sm max-w-xs mx-auto">Format vertical dynamique pour capturer l'essence de vos réalisations en vidéo.</p>
+                  </div>
+                  <Button variant="ghost" className="font-bold text-primary group-hover:translate-x-1 transition-transform">
+                    Continuer <ChevronRight className="ml-1 w-4 h-4" />
+                  </Button>
+                </Card>
+              </div>
+            ) : createType === 'post' ? (
+              <div className="max-w-2xl mx-auto py-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mb-6 hover:bg-accent"
+                  onClick={() => setCreateType('selection')}
+                >
+                  <ChevronLeft className="mr-1 w-4 h-4" /> Retour au choix
+                </Button>
+                <Card className="p-8 shadow-2xl border-primary/10">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold">Nouveau Projet</h3>
+                    <p className="text-muted-foreground">Exposez votre talent au reste de l'école</p>
+                  </div>
+                  <form onSubmit={handleCreatePost} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Titre du Projet</label>
                       <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setNewPostImage(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="file-upload"
+                        value={newPostTitle}
+                        onChange={(e) => setNewPostTitle(e.target.value)}
+                        placeholder="Ex: Refonte Dashboard, Campagne Marketing..."
+                        className="h-12 border-muted-foreground/20 focus:border-primary"
                         required
                       />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent flex items-center justify-center">
-                          <SquarePlus className="w-6 h-6 text-primary" />
-                        </div>
-                        <p className="text-sm font-medium text-foreground">{newPostImage ? newPostImage.name : 'Click to upload'}</p>
-                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
-                      </label>
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Description</label>
+                      <Textarea
+                        value={newPostDesc}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewPostDesc(e.target.value)}
+                        placeholder="Racontez l'histoire de ce projet, votre démarche..."
+                        className="min-h-[120px] resize-none border-muted-foreground/20 focus:border-primary"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Catégorie</label>
+                      <select
+                        className="w-full h-12 rounded-[var(--radius-lg)] border border-muted-foreground/20 bg-background px-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        value={newPostCategory}
+                        onChange={(e) => setNewPostCategory(e.target.value)}
+                      >
+                        <option value="Général">Général</option>
+                        <option value="Design">Design</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Tech">Tech</option>
+                        <option value="Data">Data</option>
+                        <option value="Autre">Autre</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Tags (séparés par des virgules)</label>
+                      <Input
+                        value={newPostTags}
+                        onChange={(e) => setNewPostTags(e.target.value)}
+                        placeholder="UI/UX, Backend, Strategie..."
+                        className="h-12 border-muted-foreground/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Image du Projet</label>
+                      <div className="border-2 border-dashed border-border rounded-[var(--radius-xl)] p-12 text-center hover:border-primary/50 transition-all cursor-pointer bg-accent/10">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setNewPostImage(e.target.files?.[0] || null)}
+                          className="hidden"
+                          id="file-upload"
+                          required
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer block">
+                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card shadow-sm flex items-center justify-center">
+                            <Plus className="w-8 h-8 text-primary" />
+                          </div>
+                          <p className="text-base font-bold text-foreground">
+                            {newPostImage ? newPostImage.name : 'Cliquez pour uploader l\'image'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">PNG, JPG ou WebP jusqu'à 10MB</p>
+                        </label>
+                      </div>
+                    </div>
+                    <Button type="submit" variant="brand" className="w-full h-14 text-lg font-bold" disabled={uploading}>
+                      {uploading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                      {uploading ? 'Création en cours...' : 'Publier le Projet'}
+                    </Button>
+                  </form>
+                </Card>
+              </div>
+            ) : (
+              /* Reel Creation View */
+              <div className="max-w-2xl mx-auto py-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mb-6 hover:bg-accent"
+                  onClick={() => setCreateType('selection')}
+                >
+                  <ChevronLeft className="mr-1 w-4 h-4" /> Retour au choix
+                </Button>
+                <Card className="p-8 shadow-2xl border-primary/10">
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-primary flex items-center justify-center gap-2">
+                      <Video className="w-6 h-6" /> Nouveau Reel
+                    </h3>
+                    <p className="text-muted-foreground">Une vidéo courte pour un impact maximum</p>
                   </div>
-                  <Button type="submit" variant="brand" className="w-full h-12" disabled={uploading}>
-                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {uploading ? 'Creating...' : 'Share Project'}
-                  </Button>
-                </form>
-              </Card>
+                  <div className="flex flex-col items-center justify-center p-12 bg-muted/30 rounded-3xl border-2 border-dashed border-border hover:border-primary/40 transition-colors mb-8 cursor-pointer"
+                    onClick={() => setIsCreateReelOpen(true)}>
+                    <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
+                      <Video className="w-8 h-8 text-primary" />
+                    </div>
+                    <p className="font-bold text-lg mb-2 text-center">Ouvrir l'outil de création de Reel</p>
+                    <p className="text-sm text-muted-foreground text-center">L'outil de création de Reel s'ouvrira pour vous guider.</p>
+                    <Button variant="brand" className="mt-6 rounded-full px-8">Charger une vidéo</Button>
+                  </div>
+                  <div className="text-sm text-center text-muted-foreground">
+                    <Info className="inline w-4 h-4 mr-1 -mt-0.5" /> Les reels sont automatiquement ajoutés à l'onglet dédié après publication.
+                  </div>
+                </Card>
+              </div>
             )}
           </div>
         )}
@@ -3817,61 +4094,27 @@ const StudentPortfolio: React.FC = () => {
           onItemClick={(item) => {
             const tab = item.toLowerCase();
             if (tab === 'create') {
-              setShowCreateChoice(true);
-            } else {
-              setActiveTab(tab as any);
+              setCreateType('selection');
             }
+            setActiveTab(tab as any);
           }}
         />
       </div>
 
-      {/* Create Choice Modal */}
-      <Dialog open={showCreateChoice} onOpenChange={setShowCreateChoice}>
-        <DialogContent className="max-w-sm p-0 overflow-hidden rounded-[var(--radius-xl)]">
-          <div className="p-6 space-y-4">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-foreground">Create New</h2>
-              <p className="text-sm text-muted-foreground mt-1">What would you like to share?</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Post Option */}
-              <button
-                onClick={() => {
-                  setShowCreateChoice(false);
-                  setActiveTab('create');
-                }}
-                className="group flex flex-col items-center gap-3 p-6 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border border-border hover:border-primary/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                  <Image className="w-7 h-7 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-foreground">Post</p>
-                  <p className="text-xs text-muted-foreground">Share a photo</p>
-                </div>
-              </button>
-
-              {/* Reel Option */}
-              <button
-                onClick={() => {
-                  setShowCreateChoice(false);
-                  setIsCreateReelOpen(true);
-                }}
-                className="group flex flex-col items-center gap-3 p-6 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border border-border hover:border-primary/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                  <Video className="w-7 h-7 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-foreground">Reel</p>
-                  <p className="text-xs text-muted-foreground">Share a video</p>
-                </div>
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Create Reel Dialog (Shared logic) */}
+      <CreateReelDialog
+        isOpen={isCreateReelOpen}
+        onClose={() => {
+          setIsCreateReelOpen(false);
+          setCreateType('selection');
+        }}
+        user={user}
+        onReelCreated={() => {
+          fetchData();
+          setActiveTab('reels');
+          setCreateType('selection');
+        }}
+      />
 
       {/* Highlight Creation Modal */}
       <Dialog open={showHighlightModal} onOpenChange={(open) => {

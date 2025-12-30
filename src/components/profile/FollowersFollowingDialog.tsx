@@ -13,6 +13,7 @@ interface FollowersFollowingDialogProps {
     onClose: () => void
     type: 'followers' | 'following'
     onFollowChange?: () => void
+    onUserClick?: (userId: string) => void
 }
 
 interface UserProfile {
@@ -31,12 +32,13 @@ interface FollowItem {
     isFollowing?: boolean
 }
 
-export function FollowersFollowingDialog({ 
-    userId, 
-    isOpen, 
-    onClose, 
+export function FollowersFollowingDialog({
+    userId,
+    isOpen,
+    onClose,
     type,
-    onFollowChange 
+    onFollowChange,
+    onUserClick
 }: FollowersFollowingDialogProps) {
     const { user } = useAuth()
     const [items, setItems] = useState<FollowItem[]>([])
@@ -54,60 +56,58 @@ export function FollowersFollowingDialog({
     const fetchItems = async () => {
         setLoading(true)
         try {
-            let query
+            let data: any[] | null = null;
+            let error: any = null;
 
             if (type === 'followers') {
-                // Get users who follow this user
-                query = supabase
+                const result = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        follower_id,
-                        profiles:follower_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, follower_id')
                     .eq('following_id', userId)
-                    .order('created_at', { ascending: false })
+                    .order('created_at', { ascending: false });
+                data = result.data;
+                error = result.error;
             } else {
-                // Get users that this user follows
-                query = supabase
+                const result = await supabase
                     .from('follows')
-                    .select(`
-                        id,
-                        created_at,
-                        following_id,
-                        profiles:following_id (
-                            id,
-                            username,
-                            full_name,
-                            avatar_url,
-                            course,
-                            bio
-                        )
-                    `)
+                    .select('id, created_at, following_id')
                     .eq('follower_id', userId)
-                    .order('created_at', { ascending: false })
+                    .order('created_at', { ascending: false });
+                data = result.data;
+                error = result.error;
             }
-
-            const { data, error } = await query
 
             if (error) throw error
 
-            const formattedItems: FollowItem[] = (data || []).map((item: any) => ({
-                id: item.id,
-                user: type === 'followers' ? item.profiles : item.profiles,
-                created_at: item.created_at,
-            }))
+            if (!data || data.length === 0) {
+                setItems([])
+                return
+            }
 
-            // Check if current user follows each person (only for followers list)
-            if (type === 'followers' && user) {
+            const profileIds = data.map(item => type === 'followers' ? item.follower_id : item.following_id);
+
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('id, username, full_name, avatar_url, course, bio')
+                .in('id', profileIds);
+
+            if (profileError) throw profileError;
+
+            const profileMap = (profileData || []).reduce((acc: any, p: any) => {
+                acc[p.id] = p;
+                return acc;
+            }, {});
+
+            const formattedItems: FollowItem[] = data.map((item: any) => {
+                const targetId = type === 'followers' ? item.follower_id : item.following_id;
+                return {
+                    id: item.id,
+                    user: profileMap[targetId],
+                    created_at: item.created_at,
+                };
+            }).filter(item => item.user !== null && item.user !== undefined);
+
+            if (type === 'followers' && user && formattedItems.length > 0) {
                 const userIds = formattedItems.map(item => item.user.id)
                 const { data: followData } = await supabase
                     .from('follows')
@@ -120,7 +120,6 @@ export function FollowersFollowingDialog({
                     item.isFollowing = followingIds.has(item.user.id)
                 })
             } else if (type === 'following') {
-                // For following list, all items are followed by the user
                 formattedItems.forEach(item => {
                     item.isFollowing = true
                 })
@@ -177,8 +176,8 @@ export function FollowersFollowingDialog({
             if (error) throw error
 
             // Update the item
-            setItems(prev => prev.map(item => 
-                item.user.id === targetUserId 
+            setItems(prev => prev.map(item =>
+                item.user.id === targetUserId
                     ? { ...item, isFollowing: true }
                     : item
             ))
@@ -200,7 +199,7 @@ export function FollowersFollowingDialog({
             <DialogContent className="sm:max-w-[500px] h-[600px] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-4 border-b">
                     <DialogTitle className="text-xl font-bold">
-                        {type === 'followers' ? 'Followers' : 'Following'}
+                        {type === 'followers' ? 'Abonnés' : 'Abonnements'}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -212,34 +211,37 @@ export function FollowersFollowingDialog({
                     ) : items.length === 0 ? (
                         <div className="text-center py-12">
                             <p className="text-muted-foreground">
-                                {type === 'followers' 
-                                    ? 'No followers yet' 
-                                    : 'Not following anyone yet'}
+                                {type === 'followers'
+                                    ? "Aucun abonné pour le moment"
+                                    : "Aucun abonnement pour le moment"}
                             </p>
                         </div>
                     ) : (
                         <div className="space-y-2">
                             {items.map((item) => (
-                                <div 
-                                    key={item.id} 
-                                    className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors"
+                                <div
+                                    key={item.id}
+                                    className="flex items-center justify-between p-3 rounded-xl hover:bg-accent/80 transition-all group cursor-pointer active:scale-[0.98]"
+                                    onClick={() => onUserClick?.(item.user.id)}
                                 >
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <Avatar className="w-12 h-12 flex-shrink-0">
-                                            <AvatarImage src={item.user.avatar_url} />
-                                            <AvatarFallback className="bg-accent text-primary">
-                                                {item.user.full_name[0]}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-sm truncate">
-                                                {item.user.full_name}
+                                        <div className="relative group-hover:scale-105 transition-transform duration-200">
+                                            <Avatar className="w-12 h-12 flex-shrink-0 transition-all group-hover:ring-2 group-hover:ring-primary/20">
+                                                <AvatarImage src={item.user?.avatar_url} />
+                                                <AvatarFallback className="bg-accent text-primary">
+                                                    {item.user?.full_name?.[0] || '?'}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        </div>
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <p className="font-bold text-sm truncate group-hover:text-primary transition-colors">
+                                                {item.user?.full_name || 'Utilisateur'}
                                             </p>
                                             <p className="text-xs text-muted-foreground truncate">
-                                                @{item.user.username}
+                                                @{item.user?.username || 'username'}
                                             </p>
-                                            {item.user.course && (
-                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                            {item.user?.course && (
+                                                <p className="text-[10px] text-primary/70 font-medium mt-0.5">
                                                     {item.user.course}
                                                 </p>
                                             )}
@@ -249,7 +251,9 @@ export function FollowersFollowingDialog({
                                         <Button
                                             variant={item.isFollowing ? "outline" : "default"}
                                             size="sm"
-                                            onClick={() => {
+                                            className="ml-2 rounded-full h-8 px-4 flex-shrink-0"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
                                                 if (item.isFollowing) {
                                                     handleUnfollow(item.user.id)
                                                 } else {
@@ -257,14 +261,13 @@ export function FollowersFollowingDialog({
                                                 }
                                             }}
                                             disabled={unfollowingIds.has(item.user.id)}
-                                            className="rounded-full flex-shrink-0"
                                         >
                                             {unfollowingIds.has(item.user.id) ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />
                                             ) : item.isFollowing ? (
-                                                'Unfollow'
+                                                'Suivi'
                                             ) : (
-                                                'Follow'
+                                                'Suivre'
                                             )}
                                         </Button>
                                     )}

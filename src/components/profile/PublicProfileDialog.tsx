@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Heart, Loader2, Send } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { FollowersFollowingDialog } from '@/components/profile/FollowersFollowingDialog'
 
 interface PublicProfileDialogProps {
     userId: string | null
@@ -13,11 +14,21 @@ interface PublicProfileDialogProps {
     onClose: () => void
     onFollowChange?: () => void
     onStartConversation?: (userId: string) => void
+    onViewProfile?: (userId: string) => void
+    onProjectClick?: (project: any) => void
 }
 
 import type { StudentProfile } from '@/types'
 
-export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, onStartConversation }: PublicProfileDialogProps) {
+export function PublicProfileDialog({
+    userId,
+    isOpen,
+    onClose,
+    onFollowChange,
+    onStartConversation,
+    onViewProfile,
+    onProjectClick
+}: PublicProfileDialogProps) {
     const { user } = useAuth()
     const [profile, setProfile] = useState<StudentProfile | null>(null)
     const [projects, setProjects] = useState<any[]>([])
@@ -26,6 +37,10 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
     const [followingCount, setFollowingCount] = useState(0)
     const [isFollowing, setIsFollowing] = useState(false)
     const [loadingFollow, setLoadingFollow] = useState(false)
+    const [subDialog, setSubDialog] = useState<{
+        isOpen: boolean;
+        type: 'followers' | 'following';
+    }>({ isOpen: false, type: 'followers' })
 
     useEffect(() => {
         if (userId && isOpen) {
@@ -219,11 +234,17 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
                                             <span className="font-semibold">{projects.length}</span>
                                             <span className="text-muted-foreground text-sm ml-1">projects</span>
                                         </div>
-                                        <div>
+                                        <div
+                                            className="cursor-pointer hover:opacity-70 transition-opacity"
+                                            onClick={() => setSubDialog({ isOpen: true, type: 'followers' })}
+                                        >
                                             <span className="font-semibold">{followersCount}</span>
                                             <span className="text-muted-foreground text-sm ml-1">followers</span>
                                         </div>
-                                        <div>
+                                        <div
+                                            className="cursor-pointer hover:opacity-70 transition-opacity"
+                                            onClick={() => setSubDialog({ isOpen: true, type: 'following' })}
+                                        >
                                             <span className="font-semibold">{followingCount}</span>
                                             <span className="text-muted-foreground text-sm ml-1">following</span>
                                         </div>
@@ -249,7 +270,11 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
                                 {projects.length > 0 ? (
                                     <div className="grid grid-cols-2 gap-4">
                                         {projects.map((project) => (
-                                            <div key={project.id} className="group relative aspect-video rounded-lg overflow-hidden bg-muted border">
+                                            <div
+                                                key={project.id}
+                                                className="group relative aspect-video rounded-lg overflow-hidden bg-muted border cursor-pointer hover:shadow-lg transition-all"
+                                                onClick={() => onProjectClick?.(project)}
+                                            >
                                                 {project.images?.[0] ? (
                                                     <img
                                                         src={project.images[0]}
@@ -281,6 +306,39 @@ export function PublicProfileDialog({ userId, isOpen, onClose, onFollowChange, o
                     )}
                 </ScrollArea>
             </DialogContent>
+
+            {userId && (
+                <FollowersFollowingDialog
+                    userId={userId}
+                    isOpen={subDialog.isOpen}
+                    onClose={() => setSubDialog(prev => ({ ...prev, isOpen: false }))}
+                    type={subDialog.type}
+                    onFollowChange={() => {
+                        fetchFollowCounts(userId)
+                        onFollowChange?.()
+                    }}
+                    onUserClick={(clickedUserId: string) => {
+                        setSubDialog(prev => ({ ...prev, isOpen: false }))
+
+                        // If clicking my own profile from someone else's list, close dialog and show main profile tab
+                        if (user && clickedUserId === user.id) {
+                            onClose();
+                            if (onViewProfile) {
+                                onViewProfile(clickedUserId);
+                            }
+                            return;
+                        }
+
+                        if (clickedUserId === userId) return;
+
+                        if (onViewProfile) {
+                            onViewProfile(clickedUserId);
+                        } else {
+                            onClose();
+                        }
+                    }}
+                />
+            )}
         </Dialog>
     )
 }

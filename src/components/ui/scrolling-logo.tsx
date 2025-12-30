@@ -12,11 +12,11 @@ export const ScrollingLogo: React.FC<ScrollingLogoProps> = ({ className }) => {
     // Logo components - alternating between Eugenia and Albert
     const EugeniaLogo = (
       <div className="flex items-center justify-center h-full px-6">
-        <img 
-          src="/logo%20eugenia.png" 
-          alt="Eugenia School" 
+        <img
+          src="/logo%20eugenia.png"
+          alt="Eugenia School"
           className="h-8 w-auto object-contain max-w-[200px]"
-          onError={(e) => {
+          onError={() => {
             // Fallback if image doesn't load
             console.warn('Failed to load Eugenia logo');
           }}
@@ -26,11 +26,11 @@ export const ScrollingLogo: React.FC<ScrollingLogoProps> = ({ className }) => {
 
     const AlbertLogo = (
       <div className="flex items-center justify-center h-full px-6">
-        <img 
-          src="/logo%20albert.png" 
-          alt="Albert" 
+        <img
+          src="/logo%20albert.png"
+          alt="Albert"
           className="h-8 w-auto object-contain max-w-[200px]"
-          onError={(e) => {
+          onError={() => {
             // Fallback if image doesn't load
             console.warn('Failed to load Albert logo');
           }}
