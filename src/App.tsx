@@ -43,6 +43,7 @@ const StudentPortfolio: React.FC = () => {
   const [posts, setPosts] = useState<ProjectPost[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
   const [stories, setStories] = useState<StoryItem[]>([]);
+  const [allUsers, setAllUsers] = useState<StudentProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [authOpen, setAuthOpen] = useState(false);
@@ -1798,6 +1799,16 @@ const StudentPortfolio: React.FC = () => {
         setReels(formattedReels);
       }
 
+      // Fetch all profiles for search functionality
+      const { data: allProfilesData } = await supabase
+        .from('profiles')
+        .select('id, username, full_name, avatar_url, course')
+        .order('full_name', { ascending: true });
+
+      if (allProfilesData) {
+        setAllUsers(allProfilesData);
+      }
+
       // Fetch stories with proper error handling (independent of posts)
       // Only fetch stories if user is authenticated
       if (user) {
@@ -2160,12 +2171,23 @@ const StudentPortfolio: React.FC = () => {
   const filteredPosts = posts.filter(post =>
     post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    post.profiles?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    post.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredReels = reels.filter(reel =>
     reel.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    reel.description.toLowerCase().includes(searchQuery.toLowerCase())
+    reel.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    reel.profiles?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    reel.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredUsers = allUsers.filter(profile =>
+    searchQuery && (
+      profile.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   // Calculate interaction score (likes + comments + saves)
@@ -3474,64 +3496,104 @@ const StudentPortfolio: React.FC = () => {
               ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
               return (
-                <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
-                  {combinedResults.length === 0 ? (
-                    <div className="col-span-3 text-center py-12">
-                      <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
-                    </div>
-                  ) : (
-                    combinedResults.map((item) => (
-                      item.itemType === 'post' ? (
-                        <div
-                          key={`post-${item.id}`}
-                          className="aspect-square cursor-pointer relative group overflow-hidden"
-                          onClick={() => setSelectedPost(item)}
-                        >
-                          <img
-                            src={item.images[0]}
-                            alt={item.title}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                            <div className="flex items-center gap-3 text-white text-sm">
-                              <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count}</span>
-                              <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count}</span>
+                <div className="space-y-8">
+                  {/* Matching Students Section */}
+                  {filteredUsers.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Students</h3>
+                      <div className="flex flex-col gap-1">
+                        {filteredUsers.map((profile) => (
+                          <div
+                            key={`user-${profile.id}`}
+                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border"
+                            onClick={() => setViewingUserId(profile.id)}
+                          >
+                            <Avatar className="h-12 w-12 border-2 border-background">
+                              <AvatarImage src={profile.avatar_url || ''} />
+                              <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                {profile.full_name?.charAt(0) || profile.username?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-foreground truncate">{profile.full_name || profile.username}</p>
+                              <p className="text-sm text-muted-foreground truncate">@{profile.username || 'unknown'}</p>
                             </div>
+                            {profile.course && (
+                              <div className="hidden sm:block px-3 py-1 rounded-full bg-primary/5 text-primary text-xs font-medium">
+                                {profile.course}
+                              </div>
+                            )}
                           </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Projects Section */}
+                  <div className="space-y-3">
+                    {combinedResults.length > 0 && <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Projects</h3>}
+                    <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-xl)] overflow-hidden">
+                      {combinedResults.length === 0 && filteredUsers.length === 0 ? (
+                        <div className="col-span-3 text-center py-20 bg-muted/20 rounded-2xl border-2 border-dashed border-border">
+                          <Search className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                          <p className="text-lg font-medium text-foreground">No results found</p>
+                          <p className="text-muted-foreground">Try searching for something else</p>
                         </div>
                       ) : (
-                        <div
-                          key={`reel-${item.id}`}
-                          className="aspect-square cursor-pointer relative group overflow-hidden"
-                          onClick={() => {
-                            const reelItem: PostOrReel = {
-                              ...item,
-                              images: [item.video_url],
-                              tags: [],
-                            };
-                            setSelectedPost(reelItem);
-                          }}
-                        >
-                          <video
-                            src={item.video_url}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            muted
-                            playsInline
-                          />
-                          {/* Video indicator */}
-                          <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
-                            <Video className="w-3 h-3 text-white" />
-                          </div>
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                            <div className="flex items-center gap-3 text-white text-sm">
-                              <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count || 0}</span>
-                              <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count || 0}</span>
+                        combinedResults.map((item) => (
+                          item.itemType === 'post' ? (
+                            <div
+                              key={`post-${item.id}`}
+                              className="aspect-square cursor-pointer relative group overflow-hidden"
+                              onClick={() => setSelectedPost(item)}
+                            >
+                              <img
+                                src={item.images[0]}
+                                alt={item.title}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                                <div className="flex items-center gap-3 text-white text-sm">
+                                  <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count}</span>
+                                  <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count}</span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )
-                    ))
-                  )}
+                          ) : (
+                            <div
+                              key={`reel-${item.id}`}
+                              className="aspect-square cursor-pointer relative group overflow-hidden"
+                              onClick={() => {
+                                const reelItem: PostOrReel = {
+                                  ...item,
+                                  images: [item.video_url],
+                                  tags: [],
+                                };
+                                setSelectedPost(reelItem);
+                              }}
+                            >
+                              <video
+                                src={item.video_url}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                muted
+                                playsInline
+                              />
+                              {/* Video indicator */}
+                              <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
+                                <Video className="w-3 h-3 text-white" />
+                              </div>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                                <div className="flex items-center gap-3 text-white text-sm">
+                                  <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {item.likes_count || 0}</span>
+                                  <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /> {item.comments_count || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })()}
@@ -3901,186 +3963,188 @@ const StudentPortfolio: React.FC = () => {
       </main>
 
       {/* Reels View - Full Screen */}
-      {activeTab === 'reels' && (
-        <div className="fixed inset-0 z-40 bg-black">
-          {/* Reels Container with Snap Scroll */}
-          <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
-            {reels.length === 0 ? (
-              <div className="h-screen w-full snap-start relative flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
-                <div className="text-center">
-                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center">
-                    <Clapperboard className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-2">Aucun Reel pour le moment</h3>
-                  <p className="text-white/60 text-sm mb-4">Soyez le premier à partager un Reel !</p>
-                  {user && (
-                    <Button
-                      variant="outline"
-                      className="rounded-full border-white/30 text-white hover:bg-white/10"
-                      onClick={() => setIsCreateReelOpen(true)}
-                    >
-                      <Video className="mr-2 h-4 w-4" />
-                      Créer un Reel
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    className="rounded-full text-white/60 hover:text-white hover:bg-white/10 mt-2"
-                    onClick={() => setActiveTab('home')}
-                  >
-                    Retour à l'accueil
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              reels.map((reel) => (
-                <div
-                  key={reel.id}
-                  ref={(el) => {
-                    if (el) {
-                      reelContainerRefs.current[reel.id] = el;
-                    } else {
-                      delete reelContainerRefs.current[reel.id];
-                    }
-                  }}
-                  className="reel-item h-full w-full relative flex-shrink-0 bg-black"
-                >
-                  {/* Video */}
-                  <video
-                    src={reel.video_url}
-                    className="w-full h-full object-contain"
-                    controls
-                    loop
-                    playsInline
-                    onClick={(e) => {
-                      const video = e.currentTarget;
-                      if (video.muted) {
-                        video.muted = false;
-                        video.play().catch(() => {
-                          video.muted = true;
-                        });
-                      }
-                    }}
-                    ref={(video) => {
-                      if (video) {
-                        reelVideoRefs.current[reel.id] = video;
-                      } else {
-                        delete reelVideoRefs.current[reel.id];
-                      }
-                    }}
-                  />
-
-                  {/* User Info - Bottom Left */}
-                  <div className="absolute bottom-24 left-4 right-20 z-10">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Avatar
-                        className="w-10 h-10 ring-2 ring-white/20 cursor-pointer"
-                        onClick={() => setViewingUserId(reel.user_id)}
-                      >
-                        <AvatarImage src={reel.profiles.avatar_url || undefined} />
-                        <AvatarFallback>{(reel.profiles.username || 'U')[0]}</AvatarFallback>
-                      </Avatar>
-                      <span
-                        className="text-white font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => setViewingUserId(reel.user_id)}
-                      >
-                        @{reel.profiles.username || 'unknown'}
-                      </span>
-                      {user && reel.user_id !== user.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 rounded-full border-white/30 text-white text-xs hover:bg-white/10"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const following = await checkIfFollowing(reel.user_id);
-                            if (following) {
-                              await handleUnfollow(reel.user_id);
-                            } else {
-                              await handleFollow(reel.user_id);
-                            }
-                          }}
-                          disabled={loadingFollow[reel.user_id]}
-                        >
-                          {loadingFollow[reel.user_id] ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : isFollowing[reel.user_id] ? (
-                            'Unfollow'
-                          ) : (
-                            'Follow'
-                          )}
-                        </Button>
-                      )}
+      {
+        activeTab === 'reels' && (
+          <div className="fixed inset-0 z-40 bg-black">
+            {/* Reels Container with Snap Scroll */}
+            <div className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
+              {reels.length === 0 ? (
+                <div className="h-screen w-full snap-start relative flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center">
+                      <Clapperboard className="w-10 h-10 text-white" />
                     </div>
-                    {reel.description && (
-                      <p className="text-white text-sm leading-relaxed">
-                        {reel.description}
-                      </p>
+                    <h3 className="text-white font-bold text-lg mb-2">Aucun Reel pour le moment</h3>
+                    <p className="text-white/60 text-sm mb-4">Soyez le premier à partager un Reel !</p>
+                    {user && (
+                      <Button
+                        variant="outline"
+                        className="rounded-full border-white/30 text-white hover:bg-white/10"
+                        onClick={() => setIsCreateReelOpen(true)}
+                      >
+                        <Video className="mr-2 h-4 w-4" />
+                        Créer un Reel
+                      </Button>
                     )}
-                    <div className="flex items-center gap-2 mt-2">
-                      <Music className="w-3 h-3 text-white/60" />
-                      <span className="text-white/60 text-xs">Original Sound - {reel.profiles.username}</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons - Right Side */}
-                  <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
-                    <button
-                      className="flex flex-col items-center gap-1 group"
-                      onClick={() => handleLike(reel.id)}
+                    <Button
+                      variant="ghost"
+                      className="rounded-full text-white/60 hover:text-white hover:bg-white/10 mt-2"
+                      onClick={() => setActiveTab('home')}
                     >
-                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                        <Heart className={`w-6 h-6 ${reel.liked_by_user ? 'text-[#ed3d66] fill-[#ed3d66]' : 'text-white'}`} />
-                      </div>
-                      <span className="text-white text-xs font-medium">
-                        {reel.likes_count > 0 ? (reel.likes_count > 1000 ? `${(reel.likes_count / 1000).toFixed(1)}K` : reel.likes_count) : ''}
-                      </span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1 group">
-                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                        <MessageCircle className="w-6 h-6 text-white" />
-                      </div>
-                      <span className="text-white text-xs font-medium">
-                        {reel.comments_count > 0 ? (reel.comments_count > 1000 ? `${(reel.comments_count / 1000).toFixed(1)}K` : reel.comments_count) : ''}
-                      </span>
-                    </button>
-                    <button
-                      className="flex flex-col items-center gap-1 group"
-                      onClick={() => handleSave(reel.id)}
-                    >
-                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                        <Bookmark className={`w-6 h-6 ${reel.saved_by_user ? 'text-primary fill-primary' : 'text-white'}`} />
-                      </div>
-                      <span className="text-white text-xs font-medium">Save</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1 group">
-                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                        <Share2 className="w-6 h-6 text-white" />
-                      </div>
-                      <span className="text-white text-xs font-medium">Share</span>
-                    </button>
+                      Retour à l'accueil
+                    </Button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                reels.map((reel) => (
+                  <div
+                    key={reel.id}
+                    ref={(el) => {
+                      if (el) {
+                        reelContainerRefs.current[reel.id] = el;
+                      } else {
+                        delete reelContainerRefs.current[reel.id];
+                      }
+                    }}
+                    className="reel-item h-full w-full relative flex-shrink-0 bg-black"
+                  >
+                    {/* Video */}
+                    <video
+                      src={reel.video_url}
+                      className="w-full h-full object-contain"
+                      controls
+                      loop
+                      playsInline
+                      onClick={(e) => {
+                        const video = e.currentTarget;
+                        if (video.muted) {
+                          video.muted = false;
+                          video.play().catch(() => {
+                            video.muted = true;
+                          });
+                        }
+                      }}
+                      ref={(video) => {
+                        if (video) {
+                          reelVideoRefs.current[reel.id] = video;
+                        } else {
+                          delete reelVideoRefs.current[reel.id];
+                        }
+                      }}
+                    />
 
-          {/* Reels Header */}
-          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-20">
-            <div className="flex items-center justify-between">
-              <h1 className="text-white font-bold text-xl">Reels</h1>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/10 rounded-full"
-                onClick={() => setActiveTab('home')}
-              >
-                <X className="w-6 h-6" />
-              </Button>
+                    {/* User Info - Bottom Left */}
+                    <div className="absolute bottom-24 left-4 right-20 z-10">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Avatar
+                          className="w-10 h-10 ring-2 ring-white/20 cursor-pointer"
+                          onClick={() => setViewingUserId(reel.user_id)}
+                        >
+                          <AvatarImage src={reel.profiles.avatar_url || undefined} />
+                          <AvatarFallback>{(reel.profiles.username || 'U')[0]}</AvatarFallback>
+                        </Avatar>
+                        <span
+                          className="text-white font-semibold text-sm cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setViewingUserId(reel.user_id)}
+                        >
+                          @{reel.profiles.username || 'unknown'}
+                        </span>
+                        {user && reel.user_id !== user.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 rounded-full border-white/30 text-white text-xs hover:bg-white/10"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const following = await checkIfFollowing(reel.user_id);
+                              if (following) {
+                                await handleUnfollow(reel.user_id);
+                              } else {
+                                await handleFollow(reel.user_id);
+                              }
+                            }}
+                            disabled={loadingFollow[reel.user_id]}
+                          >
+                            {loadingFollow[reel.user_id] ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isFollowing[reel.user_id] ? (
+                              'Unfollow'
+                            ) : (
+                              'Follow'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                      {reel.description && (
+                        <p className="text-white text-sm leading-relaxed">
+                          {reel.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <Music className="w-3 h-3 text-white/60" />
+                        <span className="text-white/60 text-xs">Original Sound - {reel.profiles.username}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons - Right Side */}
+                    <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6">
+                      <button
+                        className="flex flex-col items-center gap-1 group"
+                        onClick={() => handleLike(reel.id)}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                          <Heart className={`w-6 h-6 ${reel.liked_by_user ? 'text-[#ed3d66] fill-[#ed3d66]' : 'text-white'}`} />
+                        </div>
+                        <span className="text-white text-xs font-medium">
+                          {reel.likes_count > 0 ? (reel.likes_count > 1000 ? `${(reel.likes_count / 1000).toFixed(1)}K` : reel.likes_count) : ''}
+                        </span>
+                      </button>
+                      <button className="flex flex-col items-center gap-1 group">
+                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                          <MessageCircle className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-xs font-medium">
+                          {reel.comments_count > 0 ? (reel.comments_count > 1000 ? `${(reel.comments_count / 1000).toFixed(1)}K` : reel.comments_count) : ''}
+                        </span>
+                      </button>
+                      <button
+                        className="flex flex-col items-center gap-1 group"
+                        onClick={() => handleSave(reel.id)}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                          <Bookmark className={`w-6 h-6 ${reel.saved_by_user ? 'text-primary fill-primary' : 'text-white'}`} />
+                        </div>
+                        <span className="text-white text-xs font-medium">Save</span>
+                      </button>
+                      <button className="flex flex-col items-center gap-1 group">
+                        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                          <Share2 className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-xs font-medium">Share</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Reels Header */}
+            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-20">
+              <div className="flex items-center justify-between">
+                <h1 className="text-white font-bold text-xl">Reels</h1>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/10 rounded-full"
+                  onClick={() => setActiveTab('home')}
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
@@ -4440,336 +4504,342 @@ const StudentPortfolio: React.FC = () => {
       </Dialog>
 
       {/* Story Viewer - Multi-Story Support */}
-      {selectedUserStories && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
-          {/* Close Button */}
-          <button
-            className="absolute top-6 right-6 text-white/80 hover:text-white z-50 transition-colors"
-            onClick={handleCloseStories}
-          >
-            <X className="w-8 h-8" />
-          </button>
+      {
+        selectedUserStories && (
+          <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
+            {/* Close Button */}
+            <button
+              className="absolute top-6 right-6 text-white/80 hover:text-white z-50 transition-colors"
+              onClick={handleCloseStories}
+            >
+              <X className="w-8 h-8" />
+            </button>
 
-          {/* Navigation Arrows */}
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
-            onClick={handlePrevStory}
-          >
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
-            onClick={handleNextStory}
-          >
-            <ChevronRight className="w-6 h-6 text-white" />
-          </button>
+            {/* Navigation Arrows */}
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
+              onClick={handlePrevStory}
+            >
+              <ChevronLeft className="w-6 h-6 text-white" />
+            </button>
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
+              onClick={handleNextStory}
+            >
+              <ChevronRight className="w-6 h-6 text-white" />
+            </button>
 
-          <div className="w-full max-w-md aspect-[9/16] relative bg-zinc-900 rounded-[var(--radius-xl)] overflow-hidden shadow-2xl">
-            {/* Story Progress Bars */}
-            <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent">
-              {/* Multi-story progress indicators */}
-              <div className="flex gap-1 mb-4">
-                {selectedUserStories.stories.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="h-1 flex-1 rounded-full overflow-hidden bg-white/30 cursor-pointer"
-                    onClick={() => setCurrentStoryIndex(idx)}
-                  >
+            <div className="w-full max-w-md aspect-[9/16] relative bg-zinc-900 rounded-[var(--radius-xl)] overflow-hidden shadow-2xl">
+              {/* Story Progress Bars */}
+              <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent">
+                {/* Multi-story progress indicators */}
+                <div className="flex gap-1 mb-4">
+                  {selectedUserStories.stories.map((_, idx) => (
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${idx < currentStoryIndex
-                        ? 'bg-white w-full'
-                        : idx === currentStoryIndex
-                          ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] animate-pulse w-full'
-                          : 'bg-transparent w-0'
-                        }`}
+                      key={idx}
+                      className="h-1 flex-1 rounded-full overflow-hidden bg-white/30 cursor-pointer"
+                      onClick={() => setCurrentStoryIndex(idx)}
+                    >
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${idx < currentStoryIndex
+                          ? 'bg-white w-full'
+                          : idx === currentStoryIndex
+                            ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] animate-pulse w-full'
+                            : 'bg-transparent w-0'
+                          }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* User Info */}
+                <div className="flex items-center gap-3">
+                  <div className="story-ring p-0.5">
+                    <Avatar className="w-9 h-9 bg-card">
+                      <AvatarImage src={selectedUserStories.profile.avatar_url || undefined} />
+                      <AvatarFallback className="bg-accent text-primary text-sm font-medium">
+                        {(selectedUserStories.profile.username || 'U')[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-white font-semibold text-sm block">{selectedUserStories.profile.username}</span>
+                    <span className="text-white/60 text-xs">
+                      {new Date(selectedUserStories.stories[currentStoryIndex]?.created_at).toLocaleDateString()}
+                      {selectedUserStories.hasMultiple && (
+                        <span className="ml-2 text-white/40">
+                          • {currentStoryIndex + 1}/{selectedUserStories.stories.length}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Story Content */}
+              {selectedUserStories.stories[currentStoryIndex] && (
+                <div className="w-full h-full relative">
+                  {selectedUserStories.stories[currentStoryIndex].media_type === 'video' ||
+                    (selectedUserStories.stories[currentStoryIndex].media_url &&
+                      selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].image_url) ? (
+                    <video
+                      ref={(video) => {
+                        // Auto-unmute when video is ready (after user interaction with opening the story)
+                        if (video) {
+                          video.muted = false;
+                          // Try to play with sound (may fail due to browser policies)
+                          video.play().catch(() => {
+                            // If autoplay with sound fails, keep muted
+                            video.muted = true;
+                          });
+                        }
+                      }}
+                      src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
+                      className="w-full h-full object-cover"
+                      controls
+                      autoPlay
+                      muted={false}
+                      loop
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
+                      alt="Story"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  {selectedUserStories.stories[currentStoryIndex].description && (
+                    <div className="absolute bottom-20 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+                      <p className="text-lg font-medium text-white text-center leading-relaxed">
+                        {selectedUserStories.stories[currentStoryIndex].description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bottom Action Bar */}
+              <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-center gap-6">
+                  {/* Reply Input */}
+                  <div className="flex-1 flex items-center gap-2">
+                    <Input
+                      placeholder="Send message..."
+                      className="h-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 rounded-full"
                     />
                   </div>
-                ))}
-              </div>
 
-              {/* User Info */}
-              <div className="flex items-center gap-3">
-                <div className="story-ring p-0.5">
-                  <Avatar className="w-9 h-9 bg-card">
-                    <AvatarImage src={selectedUserStories.profile.avatar_url || undefined} />
-                    <AvatarFallback className="bg-accent text-primary text-sm font-medium">
-                      {(selectedUserStories.profile.username || 'U')[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-                <div className="flex-1">
-                  <span className="text-white font-semibold text-sm block">{selectedUserStories.profile.username}</span>
-                  <span className="text-white/60 text-xs">
-                    {new Date(selectedUserStories.stories[currentStoryIndex]?.created_at).toLocaleDateString()}
-                    {selectedUserStories.hasMultiple && (
-                      <span className="ml-2 text-white/40">
-                        • {currentStoryIndex + 1}/{selectedUserStories.stories.length}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
+                  {/* Add to Highlight Button */}
+                  {user && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAddToHighlight(!showAddToHighlight)}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showAddToHighlight
+                          ? 'bg-primary text-white'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                          }`}
+                      >
+                        <Heart className="w-5 h-5" />
+                      </button>
 
-            {/* Story Content */}
-            {selectedUserStories.stories[currentStoryIndex] && (
-              <div className="w-full h-full relative">
-                {selectedUserStories.stories[currentStoryIndex].media_type === 'video' ||
-                  (selectedUserStories.stories[currentStoryIndex].media_url &&
-                    selectedUserStories.stories[currentStoryIndex].media_url !== selectedUserStories.stories[currentStoryIndex].image_url) ? (
-                  <video
-                    ref={(video) => {
-                      // Auto-unmute when video is ready (after user interaction with opening the story)
-                      if (video) {
-                        video.muted = false;
-                        // Try to play with sound (may fail due to browser policies)
-                        video.play().catch(() => {
-                          // If autoplay with sound fails, keep muted
-                          video.muted = true;
-                        });
-                      }
-                    }}
-                    src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
-                    className="w-full h-full object-cover"
-                    controls
-                    autoPlay
-                    muted={false}
-                    loop
-                    playsInline
-                  />
-                ) : (
-                  <img
-                    src={selectedUserStories.stories[currentStoryIndex].media_url || selectedUserStories.stories[currentStoryIndex].image_url}
-                    alt="Story"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {selectedUserStories.stories[currentStoryIndex].description && (
-                  <div className="absolute bottom-20 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-                    <p className="text-lg font-medium text-white text-center leading-relaxed">
-                      {selectedUserStories.stories[currentStoryIndex].description}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Bottom Action Bar */}
-            <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 to-transparent">
-              <div className="flex items-center justify-center gap-6">
-                {/* Reply Input */}
-                <div className="flex-1 flex items-center gap-2">
-                  <Input
-                    placeholder="Send message..."
-                    className="h-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 rounded-full"
-                  />
-                </div>
-
-                {/* Add to Highlight Button */}
-                {user && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowAddToHighlight(!showAddToHighlight)}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${showAddToHighlight
-                        ? 'bg-primary text-white'
-                        : 'bg-white/10 text-white hover:bg-white/20'
-                        }`}
-                    >
-                      <Heart className="w-5 h-5" />
-                    </button>
-
-                    {/* Highlight Selection Menu */}
-                    {showAddToHighlight && (
-                      <div className="absolute bottom-14 right-0 w-48 bg-card rounded-xl shadow-2xl border border-border overflow-hidden animate-scale-in">
-                        <div className="p-2 border-b border-border">
-                          <p className="text-xs font-semibold text-foreground px-2">Add to Highlight</p>
-                        </div>
-                        <div className="max-h-48 overflow-y-auto">
-                          {profileHighlights.map((highlight) => (
-                            <button
-                              key={highlight.id}
-                              onClick={() => addStoryToHighlight(highlight.id, highlight.title)}
-                              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
-                            >
-                              <div className="w-8 h-8 rounded-full overflow-hidden border border-border">
-                                <img src={highlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} alt="" className="w-full h-full object-cover" />
-                              </div>
-                              <span className="text-sm text-foreground truncate">{highlight.title}</span>
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => {
-                            setShowAddToHighlight(false);
-                            handleCloseStories();
-                            setActiveTab('profile');
-                            setTimeout(() => setShowHighlightModal(true), 300);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2 border-t border-border hover:bg-accent transition-colors"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-primary" />
+                      {/* Highlight Selection Menu */}
+                      {showAddToHighlight && (
+                        <div className="absolute bottom-14 right-0 w-48 bg-card rounded-xl shadow-2xl border border-border overflow-hidden animate-scale-in">
+                          <div className="p-2 border-b border-border">
+                            <p className="text-xs font-semibold text-foreground px-2">Add to Highlight</p>
                           </div>
-                          <span className="text-sm text-primary font-medium">New Highlight</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                          <div className="max-h-48 overflow-y-auto">
+                            {profileHighlights.map((highlight) => (
+                              <button
+                                key={highlight.id}
+                                onClick={() => addStoryToHighlight(highlight.id, highlight.title)}
+                                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-accent transition-colors"
+                              >
+                                <div className="w-8 h-8 rounded-full overflow-hidden border border-border">
+                                  <img src={highlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} alt="" className="w-full h-full object-cover" />
+                                </div>
+                                <span className="text-sm text-foreground truncate">{highlight.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setShowAddToHighlight(false);
+                              handleCloseStories();
+                              setActiveTab('profile');
+                              setTimeout(() => setShowHighlightModal(true), 300);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 border-t border-border hover:bg-accent transition-colors"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
+                              <Plus className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="text-sm text-primary font-medium">New Highlight</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                {/* Share Button */}
-                <button className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-                  <Share2 className="w-5 h-5" />
-                </button>
+                  {/* Share Button */}
+                  <button className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Tap zones for navigation */}
-            <div className="absolute inset-0 flex z-10">
-              <div
-                className="w-1/3 h-full cursor-pointer"
-                onClick={handlePrevStory}
-              />
-              <div className="w-1/3 h-full" />
-              <div
-                className="w-1/3 h-full cursor-pointer"
-                onClick={handleNextStory}
-              />
+              {/* Tap zones for navigation */}
+              <div className="absolute inset-0 flex z-10">
+                <div
+                  className="w-1/3 h-full cursor-pointer"
+                  onClick={handlePrevStory}
+                />
+                <div className="w-1/3 h-full" />
+                <div
+                  className="w-1/3 h-full cursor-pointer"
+                  onClick={handleNextStory}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Highlight Viewer */}
-      {viewingHighlight && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
-          {/* Close Button */}
-          <button
-            className="absolute top-6 right-6 text-white/80 hover:text-white z-50 transition-colors"
-            onClick={() => {
-              setViewingHighlight(null);
-              setHighlightStoryIndex(0);
-            }}
-          >
-            <X className="w-8 h-8" />
-          </button>
+      {
+        viewingHighlight && (
+          <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
+            {/* Close Button */}
+            <button
+              className="absolute top-6 right-6 text-white/80 hover:text-white z-50 transition-colors"
+              onClick={() => {
+                setViewingHighlight(null);
+                setHighlightStoryIndex(0);
+              }}
+            >
+              <X className="w-8 h-8" />
+            </button>
 
-          {/* Navigation Arrows */}
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
-            onClick={prevHighlightStory}
-          >
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
-            onClick={nextHighlightStory}
-          >
-            <ChevronRight className="w-6 h-6 text-white" />
-          </button>
+            {/* Navigation Arrows */}
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
+              onClick={prevHighlightStory}
+            >
+              <ChevronLeft className="w-6 h-6 text-white" />
+            </button>
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors z-50 backdrop-blur-sm"
+              onClick={nextHighlightStory}
+            >
+              <ChevronRight className="w-6 h-6 text-white" />
+            </button>
 
-          <div className="w-full max-w-md aspect-[9/16] relative bg-zinc-900 rounded-[var(--radius-xl)] overflow-hidden shadow-2xl">
-            {/* Progress Bars */}
-            <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent">
-              <div className="flex gap-1 mb-4">
-                {viewingHighlight.stories.map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="h-1 flex-1 rounded-full overflow-hidden bg-white/30 cursor-pointer"
-                    onClick={() => setHighlightStoryIndex(idx)}
-                  >
+            <div className="w-full max-w-md aspect-[9/16] relative bg-zinc-900 rounded-[var(--radius-xl)] overflow-hidden shadow-2xl">
+              {/* Progress Bars */}
+              <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent">
+                <div className="flex gap-1 mb-4">
+                  {viewingHighlight.stories.map((_, idx) => (
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${idx < highlightStoryIndex
-                        ? 'bg-white w-full'
-                        : idx === highlightStoryIndex
-                          ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] w-full'
-                          : 'bg-transparent w-0'
-                        }`}
+                      key={idx}
+                      className="h-1 flex-1 rounded-full overflow-hidden bg-white/30 cursor-pointer"
+                      onClick={() => setHighlightStoryIndex(idx)}
+                    >
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${idx < highlightStoryIndex
+                          ? 'bg-white w-full'
+                          : idx === highlightStoryIndex
+                            ? 'bg-gradient-to-r from-[#ed3d66] to-[#f97316] w-full'
+                            : 'bg-transparent w-0'
+                          }`}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Highlight Info */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
+                    <img src={viewingHighlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-white font-semibold text-sm block">{viewingHighlight.title}</span>
+                    <span className="text-white/60 text-xs">
+                      {highlightStoryIndex + 1} of {viewingHighlight.stories.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Story Content */}
+              {viewingHighlight.stories[highlightStoryIndex] && (
+                <div className="w-full h-full relative">
+                  {viewingHighlight.stories[highlightStoryIndex].media_type === 'video' ||
+                    (viewingHighlight.stories[highlightStoryIndex].media_url &&
+                      viewingHighlight.stories[highlightStoryIndex].media_url !== viewingHighlight.stories[highlightStoryIndex].image) ? (
+                    <video
+                      ref={(video) => {
+                        // Auto-unmute when video is ready (after user interaction with opening the highlight)
+                        if (video) {
+                          video.muted = false;
+                          // Try to play with sound (may fail due to browser policies)
+                          video.play().catch(() => {
+                            // If autoplay with sound fails, keep muted
+                            video.muted = true;
+                          });
+                        }
+                      }}
+                      src={viewingHighlight.stories[highlightStoryIndex].media_url || viewingHighlight.stories[highlightStoryIndex].image}
+                      className="w-full h-full object-cover"
+                      controls
+                      autoPlay
+                      muted={false}
+                      loop
+                      playsInline
                     />
-                  </div>
-                ))}
-              </div>
-
-              {/* Highlight Info */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
-                  <img src={viewingHighlight.cover_image || 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=200&h=200&fit=crop'} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <img
+                      src={viewingHighlight.stories[highlightStoryIndex].media_url || viewingHighlight.stories[highlightStoryIndex].image}
+                      alt="Highlight Story"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  {viewingHighlight.stories[highlightStoryIndex].description && (
+                    <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+                      <p className="text-lg font-medium text-white text-center leading-relaxed">
+                        {viewingHighlight.stories[highlightStoryIndex].description}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <span className="text-white font-semibold text-sm block">{viewingHighlight.title}</span>
-                  <span className="text-white/60 text-xs">
-                    {highlightStoryIndex + 1} of {viewingHighlight.stories.length}
-                  </span>
-                </div>
-              </div>
-            </div>
+              )}
 
-            {/* Story Content */}
-            {viewingHighlight.stories[highlightStoryIndex] && (
-              <div className="w-full h-full relative">
-                {viewingHighlight.stories[highlightStoryIndex].media_type === 'video' ||
-                  (viewingHighlight.stories[highlightStoryIndex].media_url &&
-                    viewingHighlight.stories[highlightStoryIndex].media_url !== viewingHighlight.stories[highlightStoryIndex].image) ? (
-                  <video
-                    ref={(video) => {
-                      // Auto-unmute when video is ready (after user interaction with opening the highlight)
-                      if (video) {
-                        video.muted = false;
-                        // Try to play with sound (may fail due to browser policies)
-                        video.play().catch(() => {
-                          // If autoplay with sound fails, keep muted
-                          video.muted = true;
-                        });
-                      }
-                    }}
-                    src={viewingHighlight.stories[highlightStoryIndex].media_url || viewingHighlight.stories[highlightStoryIndex].image}
-                    className="w-full h-full object-cover"
-                    controls
-                    autoPlay
-                    muted={false}
-                    loop
-                    playsInline
-                  />
-                ) : (
-                  <img
-                    src={viewingHighlight.stories[highlightStoryIndex].media_url || viewingHighlight.stories[highlightStoryIndex].image}
-                    alt="Highlight Story"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {viewingHighlight.stories[highlightStoryIndex].description && (
-                  <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-                    <p className="text-lg font-medium text-white text-center leading-relaxed">
-                      {viewingHighlight.stories[highlightStoryIndex].description}
-                    </p>
-                  </div>
-                )}
+              {/* Tap zones for navigation */}
+              <div className="absolute inset-0 flex z-10">
+                <div className="w-1/3 h-full cursor-pointer" onClick={prevHighlightStory} />
+                <div className="w-1/3 h-full" />
+                <div className="w-1/3 h-full cursor-pointer" onClick={nextHighlightStory} />
               </div>
-            )}
-
-            {/* Tap zones for navigation */}
-            <div className="absolute inset-0 flex z-10">
-              <div className="w-1/3 h-full cursor-pointer" onClick={prevHighlightStory} />
-              <div className="w-1/3 h-full" />
-              <div className="w-1/3 h-full cursor-pointer" onClick={nextHighlightStory} />
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Toast Notification */}
-      {addedToHighlightToast && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] animate-fade-up">
-          <div className="flex items-center gap-2 px-4 py-3 bg-card border border-border rounded-full shadow-2xl">
-            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+      {
+        addedToHighlightToast && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] animate-fade-up">
+            <div className="flex items-center gap-2 px-4 py-3 bg-card border border-border rounded-full shadow-2xl">
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-foreground">Added to {addedToHighlightToast}</span>
             </div>
-            <span className="text-sm font-medium text-foreground">Added to {addedToHighlightToast}</span>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
   );
 };
