@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info, Shield } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, X, Search, Home, User as UserIcon, SquarePlus, Send, ChevronLeft, ChevronRight, Loader2, LogIn, LogOut, Plus, GraduationCap, Clapperboard, Image, Image as ImageIcon, Video, Music, Github, Linkedin, Phone, Video as VideoCall, Info, Shield, Trash2 } from 'lucide-react';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -1033,6 +1033,50 @@ const StudentPortfolio: React.FC = () => {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!user || !selectedConversation) return;
+
+    // Vérifier que le message appartient à l'utilisateur
+    const message = messages.find(msg => msg.id === messageId);
+    if (!message || message.sender_id !== user.id) {
+      alert('Vous ne pouvez supprimer que vos propres messages.');
+      return;
+    }
+
+    // Demander confirmation
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce message ?')) {
+      return;
+    }
+
+    try {
+      // Supprimer le message de la base de données
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('sender_id', user.id); // Double vérification de sécurité
+
+      if (error) throw error;
+
+      // Mettre à jour l'état local
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+
+      // Mettre à jour la conversation pour refléter le changement
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', selectedConversation);
+
+      // Rafraîchir les conversations pour mettre à jour le dernier message
+      if (isMessagesOpen) {
+        fetchConversations();
+      }
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      alert(`Failed to delete message: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const handleStartNewConversation = async (targetUserId: string) => {
     if (!user || !targetUserId || targetUserId === user.id) return;
 
@@ -2046,6 +2090,69 @@ const StudentPortfolio: React.FC = () => {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    if (!user || !userProfile) return;
+    
+    // Vérifier si l'utilisateur est admin
+    if (userProfile.role !== 'admin' && !userProfile.is_admin) {
+      alert('Vous n\'avez pas les permissions nécessaires pour supprimer ce post.');
+      return;
+    }
+
+    // Demander confirmation
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce post ? Cette action est irréversible.')) {
+      return;
+    }
+
+    try {
+      // Supprimer le post de la base de données
+      // Supabase supprimera automatiquement les likes, comments et saved_posts liés grâce aux foreign keys
+      const { error, data } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .select();
+
+      if (error) {
+        console.error('Delete error details:', error);
+        // Vérifier si c'est une erreur RLS
+        if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
+          throw new Error('Vous n\'avez pas les permissions nécessaires. Assurez-vous que les politiques RLS sont correctement configurées dans Supabase.');
+        }
+        throw error;
+      }
+
+      // Vérifier que la suppression a bien eu lieu
+      if (!data || data.length === 0) {
+        console.warn('No rows deleted. Post may not exist or RLS policy prevented deletion.');
+        // Rafraîchir quand même les données pour s'assurer de la cohérence
+        await fetchData();
+        alert('Le post n\'a pas pu être supprimé. Vérifiez les permissions RLS dans Supabase.');
+        return;
+      }
+
+      // Mettre à jour l'état local
+      setPosts(posts.filter(p => p.id !== postId));
+      setReels(reels.filter(r => r.id !== postId));
+      
+      // Si le post supprimé était sélectionné, fermer la vue détaillée
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost(null);
+      }
+
+      // Rafraîchir les données depuis la base pour s'assurer de la cohérence
+      await fetchData();
+
+      // Rafraîchir les posts sauvegardés si nécessaire
+      if (savedPosts.length > 0) {
+        fetchSavedPosts();
+      }
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      alert(`Échec de la suppression du post: ${error.message || 'Erreur inconnue'}\n\nSi le problème persiste, exécutez le script SQL fix_posts_delete_rls.sql dans Supabase.`);
+    }
+  };
+
   const handleComment = async () => {
     if (!user) {
       setAuthOpen(true);
@@ -2546,18 +2653,31 @@ const StudentPortfolio: React.FC = () => {
                           return (
                             <div
                               key={msg.id}
-                              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1`}
+                              className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-1 group`}
                             >
-                              <div
-                                className={`px-4 py-2 rounded-2xl max-w-[65%] ${isOwnMessage
-                                  ? 'bg-primary text-primary-foreground rounded-br-sm'
-                                  : 'bg-accent/50 text-foreground rounded-bl-sm'
-                                  }`}
-                              >
-                                <p className="text-sm leading-relaxed">{msg.content}</p>
-                                <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
-                                  {formatMessageTime(new Date(msg.created_at || ""))}
-                                </p>
+                              <div className={`relative flex items-end gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+                                {isOwnMessage && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                    onClick={() => handleDeleteMessage(msg.id)}
+                                    title="Supprimer ce message"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <div
+                                  className={`px-4 py-2 rounded-2xl max-w-[65%] ${isOwnMessage
+                                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                    : 'bg-accent/50 text-foreground rounded-bl-sm'
+                                    }`}
+                                >
+                                  <p className="text-sm leading-relaxed">{msg.content}</p>
+                                  <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+                                    {formatMessageTime(new Date(msg.created_at || ""))}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           );
@@ -3086,9 +3206,22 @@ const StudentPortfolio: React.FC = () => {
                                   <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="icon" className="rounded-full">
-                                <MoreHorizontal className="h-5 w-5" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                {(userProfile?.role === 'admin' || userProfile?.is_admin) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeletePost(itemId)}
+                                    title="Supprimer ce post"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="icon" className="rounded-full">
+                                  <MoreHorizontal className="h-5 w-5" />
+                                </Button>
+                              </div>
                             </div>
 
                             {/* Post/Reel Media */}
@@ -3298,9 +3431,22 @@ const StudentPortfolio: React.FC = () => {
                                 <p className="text-xs text-muted-foreground">{item.profiles.course || 'Student'}</p>
                               </div>
                             </div>
-                            <Button variant="ghost" size="icon" className="rounded-full">
-                              <MoreHorizontal className="h-5 w-5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {(userProfile?.role === 'admin' || userProfile?.is_admin) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDeletePost(itemId)}
+                                  title="Supprimer ce post"
+                                >
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="rounded-full">
+                                <MoreHorizontal className="h-5 w-5" />
+                              </Button>
+                            </div>
                           </div>
 
                           {/* Post/Reel Media */}
