@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Loader2, Image as ImageIcon, Video } from 'lucide-react'
 
@@ -17,19 +18,19 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
     const [mediaFile, setMediaFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null)
-    const [title, setTitle] = useState('')
+    const [description, setDescription] = useState('')
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0]
             const isVideo = file.type.startsWith('video/')
             const isImage = file.type.startsWith('image/')
-            
+
             if (!isVideo && !isImage) {
                 alert('Veuillez sélectionner une image ou une vidéo')
                 return
             }
-            
+
             setMediaFile(file)
             setMediaType(isVideo ? 'video' : 'image')
             setPreviewUrl(URL.createObjectURL(file))
@@ -61,10 +62,9 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                 .from('stories')
                 .insert({
                     user_id: user.id,
-                    image_url: publicUrl, // Keep for backward compatibility
-                    media_url: publicUrl, // New field for both images and videos
-                    media_type: mediaType, // 'image' or 'video'
-                    title: title || null,
+                    media_url: publicUrl,
+                    media_type: mediaType!, // Asserted because mediaFile check ensures mediaType is set
+                    description: description.trim() || null,
                     created_at: new Date().toISOString(),
                     expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
                 })
@@ -88,7 +88,7 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
         setMediaFile(null)
         setPreviewUrl(null)
         setMediaType(null)
-        setTitle('')
+        setDescription('')
         onClose()
     }
 
@@ -107,8 +107,8 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                         {previewUrl ? (
                             <div className="relative w-full max-w-[280px] mx-auto aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-lg">
                                 {mediaType === 'video' ? (
-                                    <video 
-                                        src={previewUrl} 
+                                    <video
+                                        src={previewUrl}
                                         className="w-full h-full object-cover"
                                         controls
                                         muted
@@ -158,11 +158,16 @@ export function CreateStoryDialog({ isOpen, onClose, user, onStoryCreated }: Cre
                     </div>
 
                     <div className="space-y-2">
-                        <Input
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                        <Textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
                             placeholder="Add a caption (optional)..."
+                            className="w-full min-h-[100px] p-3 text-sm rounded-md border border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                            maxLength={500}
                         />
+                        <div className="text-[10px] text-muted-foreground text-right">
+                            {description.length}/500
+                        </div>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
