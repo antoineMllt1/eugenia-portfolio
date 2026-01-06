@@ -2232,6 +2232,81 @@ const StudentPortfolio: React.FC = () => {
     }
   };
 
+  const handleDeleteComment = async (commentId: string, postId: string) => {
+    if (!user || !userProfile) return;
+
+    // Vérifier si l'utilisateur est admin
+    if (userProfile.role !== 'admin' && !userProfile.is_admin) {
+      alert('Vous n\'avez pas les permissions nécessaires pour supprimer ce commentaire.');
+      return;
+    }
+
+    // Demander confirmation
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce commentaire ?')) {
+      return;
+    }
+
+    try {
+      // Supprimer le commentaire de la base de données
+      const { error, data } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .select();
+
+      if (error) {
+        console.error('Delete error details:', error);
+        if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
+          throw new Error('Vous n\'avez pas les permissions nécessaires. Assurez-vous que les politiques RLS sont correctement configurées dans Supabase.');
+        }
+        throw error;
+      }
+
+      // Vérifier que la suppression a bien eu lieu
+      if (!data || data.length === 0) {
+        console.warn('No rows deleted. Comment may not exist or RLS policy prevented deletion.');
+        alert('Le commentaire n\'a pas pu être supprimé. Vérifiez les permissions RLS dans Supabase.');
+        return;
+      }
+
+      // Mettre à jour l'état local - retirer le commentaire de la liste
+      setPostComments(prev => ({
+        ...prev,
+        [postId]: (prev[postId] || []).filter(comment => comment.id !== commentId)
+      }));
+
+      // Mettre à jour le compteur de commentaires
+      const newCommentsCount = Math.max(0, (selectedPost?.comments_count || 0) - 1);
+
+      // Update in posts or reels
+      const reel = reels.find(r => r.id === postId);
+      if (reel) {
+        setReels(reels.map(r =>
+          r.id === postId
+            ? { ...r, comments_count: newCommentsCount }
+            : r
+        ));
+      } else {
+        setPosts(posts.map(post =>
+          post.id === postId
+            ? { ...post, comments_count: newCommentsCount }
+            : post
+        ));
+      }
+
+      // Update selectedPost if it's the same item
+      if (selectedPost && selectedPost.id === postId) {
+        setSelectedPost({
+          ...selectedPost,
+          comments_count: newCommentsCount,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error deleting comment:', error);
+      alert(`Échec de la suppression du commentaire: ${error.message || 'Erreur inconnue'}`);
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newPostImage) return;
@@ -4576,7 +4651,7 @@ const StudentPortfolio: React.FC = () => {
                   ) : selectedPost && postComments[selectedPost.id] && postComments[selectedPost.id].length > 0 ? (
                     <div className="space-y-3 max-h-[300px] overflow-y-auto">
                       {postComments[selectedPost.id].map((comment) => (
-                        <div key={comment.id} className="flex gap-3">
+                        <div key={comment.id} className="flex gap-3 group">
                           <Avatar className="w-8 h-8 flex-shrink-0">
                             <AvatarImage src={comment.profiles.avatar_url || undefined} />
                             <AvatarFallback className="bg-accent text-primary text-xs">
@@ -4584,9 +4659,20 @@ const StudentPortfolio: React.FC = () => {
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <div className="bg-accent/50 rounded-lg p-2">
+                            <div className="bg-accent/50 rounded-lg p-2 relative">
                               <p className="text-sm font-semibold">{comment.profiles.username || 'username'}</p>
                               <p className="text-sm text-foreground break-words">{comment.text}</p>
+                              {(userProfile?.role === 'admin' || userProfile?.is_admin) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                  onClick={() => handleDeleteComment(comment.id, selectedPost.id)}
+                                  title="Supprimer ce commentaire"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1 ml-2">
                               {new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
