@@ -2107,12 +2107,29 @@ const StudentPortfolio: React.FC = () => {
     try {
       // Supprimer le post de la base de données
       // Supabase supprimera automatiquement les likes, comments et saved_posts liés grâce aux foreign keys
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('posts')
         .delete()
-        .eq('id', postId);
+        .eq('id', postId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error details:', error);
+        // Vérifier si c'est une erreur RLS
+        if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
+          throw new Error('Vous n\'avez pas les permissions nécessaires. Assurez-vous que les politiques RLS sont correctement configurées dans Supabase.');
+        }
+        throw error;
+      }
+
+      // Vérifier que la suppression a bien eu lieu
+      if (!data || data.length === 0) {
+        console.warn('No rows deleted. Post may not exist or RLS policy prevented deletion.');
+        // Rafraîchir quand même les données pour s'assurer de la cohérence
+        await fetchData();
+        alert('Le post n\'a pas pu être supprimé. Vérifiez les permissions RLS dans Supabase.');
+        return;
+      }
 
       // Mettre à jour l'état local
       setPosts(posts.filter(p => p.id !== postId));
@@ -2123,13 +2140,16 @@ const StudentPortfolio: React.FC = () => {
         setSelectedPost(null);
       }
 
+      // Rafraîchir les données depuis la base pour s'assurer de la cohérence
+      await fetchData();
+
       // Rafraîchir les posts sauvegardés si nécessaire
       if (savedPosts.length > 0) {
         fetchSavedPosts();
       }
     } catch (error: any) {
       console.error('Error deleting post:', error);
-      alert(`Failed to delete post: ${error.message || 'Unknown error'}`);
+      alert(`Échec de la suppression du post: ${error.message || 'Erreur inconnue'}\n\nSi le problème persiste, exécutez le script SQL fix_posts_delete_rls.sql dans Supabase.`);
     }
   };
 
