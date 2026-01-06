@@ -54,6 +54,12 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
         return [defaultLang]
     })
 
+    // Fonction pour valider le domaine email
+    const isValidEmailDomain = (email: string): boolean => {
+        const allowedDomains = ['@eugeniaschool.com', '@albertschool.com']
+        return allowedDomains.some(domain => email.toLowerCase().endsWith(domain))
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
@@ -155,6 +161,13 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                 
                 onClose()
             } else {
+                // Validation du domaine email pour l'inscription
+                if (!isValidEmailDomain(email)) {
+                    setError('Seules les adresses email @eugeniaschool.com et @albertschool.com sont autorisées pour créer un compte.')
+                    setLoading(false)
+                    return
+                }
+
                 const selectedLang = selectedLanguage[0] || 'fr'
                 const { data, error } = await supabase.auth.signUp({
                     email,
@@ -277,11 +290,18 @@ export function AuthDialog({ isOpen, onClose, defaultTab = 'login' }: AuthDialog
                     <div className="space-y-2">
                         <Input
                             type="email"
-                            placeholder={t('auth.emailPlaceholder')}
+                            placeholder={!isLogin && !isForgotPassword 
+                                ? "Email (@eugeniaschool.com ou @albertschool.com)"
+                                : t('auth.emailPlaceholder')}
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
+                        {!isLogin && !isForgotPassword && (
+                            <p className="text-xs text-muted-foreground">
+                                Seules les adresses email @eugeniaschool.com et @albertschool.com sont acceptées
+                            </p>
+                        )}
                     </div>
 
                     {!isForgotPassword && (
