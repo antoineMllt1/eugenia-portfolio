@@ -54,7 +54,7 @@ const StudentPortfolio: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'reels' | 'create' | 'profile' | 'admin'>('home');
   const [homeFeedTab, setHomeFeedTab] = useState<'trending' | 'all'>('trending'); // Onglet actif dans Home
-  const [showCreateChoice, setShowCreateChoice] = useState(false);
+  const [createType, setCreateType] = useState<'post' | 'reel' | null>(null);
   const [commentText, setCommentText] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
   const reelVideoRefs = useRef<Record<string, HTMLVideoElement>>({});
@@ -2339,6 +2339,7 @@ const StudentPortfolio: React.FC = () => {
       setNewPostDesc('');
       setNewPostTags('');
       setNewPostImage(null);
+      setCreateType(null);
       setActiveTab('home');
       fetchData();
 
@@ -2989,9 +2990,15 @@ const StudentPortfolio: React.FC = () => {
 
       <CreateReelDialog
         isOpen={isCreateReelOpen}
-        onClose={() => setIsCreateReelOpen(false)}
+        onClose={() => {
+          setIsCreateReelOpen(false);
+          setCreateType(null);
+        }}
         user={user}
         onReelCreated={() => {
+          setIsCreateReelOpen(false);
+          setCreateType(null);
+          setActiveTab('home');
           fetchData();
         }}
       />
@@ -3822,78 +3829,164 @@ const StudentPortfolio: React.FC = () => {
         )}
 
         {activeTab === 'create' && (
-          <div className="space-y-6 animate-fade-up">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">Share Your Project</h2>
-              <p className="text-sm text-muted-foreground">Showcase your work to the Eugenia community</p>
-            </div>
+          <div className="space-y-6 animate-fade-up min-h-[calc(100vh-200px)]">
             {!user ? (
               <Card className="p-8 text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent flex items-center justify-center">
                   <LogIn className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Sign in required</h3>
-                <p className="text-muted-foreground text-sm mb-4">You need to sign in to create a project.</p>
+                <p className="text-muted-foreground text-sm mb-4">You need to sign in to create content.</p>
                 <Button variant="brand" onClick={() => setAuthOpen(true)}>{t('auth.signIn')}</Button>
               </Card>
-            ) : (
-              <Card className="p-6">
-                <form onSubmit={handleCreatePost} className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Project Title</label>
-                    <Input
-                      value={newPostTitle}
-                      onChange={(e) => setNewPostTitle(e.target.value)}
-                      placeholder="My Awesome Project"
-                      className="h-12"
-                      required
-                    />
+            ) : !createType ? (
+              // Page de sélection du type de contenu
+              <div className="space-y-6">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-foreground mb-2">Create New</h2>
+                  <p className="text-sm text-muted-foreground">What would you like to share with the community?</p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                  {/* Post Option */}
+                  <button
+                    onClick={() => setCreateType('post')}
+                    className="group flex flex-col items-center gap-4 p-8 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border-2 border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg"
+                  >
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <Image className="w-10 h-10 text-white" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-foreground mb-1">Post</p>
+                      <p className="text-sm text-muted-foreground">Share a photo or image</p>
+                    </div>
+                  </button>
+
+                  {/* Reel Option */}
+                  <button
+                    onClick={() => setCreateType('reel')}
+                    className="group flex flex-col items-center gap-4 p-8 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border-2 border-border hover:border-primary/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-lg"
+                  >
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                      <Video className="w-10 h-10 text-white" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xl font-bold text-foreground mb-1">Reel</p>
+                      <p className="text-sm text-muted-foreground">Share a video reel</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : createType === 'post' ? (
+              // Formulaire de création de Post
+              <div className="space-y-6 max-w-2xl mx-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setCreateType(null)}
+                    className="rounded-full"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">Create Post</h2>
+                    <p className="text-sm text-muted-foreground">Share a photo with the community</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Description</label>
-                    <Input
-                      value={newPostDesc}
-                      onChange={(e) => setNewPostDesc(e.target.value)}
-                      placeholder="Tell us about your project..."
-                      className="h-12"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Tags</label>
-                    <Input
-                      value={newPostTags}
-                      onChange={(e) => setNewPostTags(e.target.value)}
-                      placeholder="react, ai, design (comma separated)"
-                      className="h-12"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Project Image</label>
-                    <div className="border-2 border-dashed border-border rounded-[var(--radius-xl)] p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+                </div>
+
+                <Card className="p-6">
+                  <form onSubmit={handleCreatePost} className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Project Title</label>
                       <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setNewPostImage(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="file-upload"
+                        value={newPostTitle}
+                        onChange={(e) => setNewPostTitle(e.target.value)}
+                        placeholder="My Awesome Project"
+                        className="h-12"
                         required
                       />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent flex items-center justify-center">
-                          <SquarePlus className="w-6 h-6 text-primary" />
-                        </div>
-                        <p className="text-sm font-medium text-foreground">{newPostImage ? newPostImage.name : 'Click to upload'}</p>
-                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
-                      </label>
                     </div>
-                  </div>
-                  <Button type="submit" variant="brand" className="w-full h-12" disabled={uploading}>
-                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {uploading ? 'Creating...' : 'Share Project'}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Description</label>
+                      <Input
+                        value={newPostDesc}
+                        onChange={(e) => setNewPostDesc(e.target.value)}
+                        placeholder="Tell us about your project..."
+                        className="h-12"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Tags</label>
+                      <Input
+                        value={newPostTags}
+                        onChange={(e) => setNewPostTags(e.target.value)}
+                        placeholder="react, ai, design (comma separated)"
+                        className="h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-foreground">Project Image</label>
+                      <div className="border-2 border-dashed border-border rounded-[var(--radius-xl)] p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setNewPostImage(e.target.files?.[0] || null)}
+                          className="hidden"
+                          id="file-upload"
+                          required
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer">
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-accent flex items-center justify-center">
+                            <SquarePlus className="w-6 h-6 text-primary" />
+                          </div>
+                          <p className="text-sm font-medium text-foreground">{newPostImage ? newPostImage.name : 'Click to upload'}</p>
+                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
+                        </label>
+                      </div>
+                    </div>
+                    <Button type="submit" variant="brand" className="w-full h-12" disabled={uploading}>
+                      {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {uploading ? 'Creating...' : 'Share Post'}
+                    </Button>
+                  </form>
+                </Card>
+              </div>
+            ) : (
+              // Section pour créer un Reel
+              <div className="space-y-6 max-w-2xl mx-auto">
+                <div className="flex items-center gap-4 mb-6">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setCreateType(null);
+                      setIsCreateReelOpen(false);
+                    }}
+                    className="rounded-full"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
                   </Button>
-                </form>
-              </Card>
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">Create Reel</h2>
+                    <p className="text-sm text-muted-foreground">Share a video reel with the community</p>
+                  </div>
+                </div>
+                <Card className="p-6">
+                  <p className="text-sm text-muted-foreground mb-4 text-center">
+                    Click the button below to open the reel creation form
+                  </p>
+                  <Button
+                    variant="brand"
+                    className="w-full h-12"
+                    onClick={() => setIsCreateReelOpen(true)}
+                  >
+                    <Video className="mr-2 h-4 w-4" />
+                    Create Reel
+                  </Button>
+                </Card>
+              </div>
             )}
           </div>
         )}
@@ -4379,62 +4472,11 @@ const StudentPortfolio: React.FC = () => {
           ]}
           activeItem={activeTab}
           onItemClick={(id) => {
-            if (id === 'create') {
-              setShowCreateChoice(true);
-            } else {
-              setActiveTab(id as any);
-            }
+            setActiveTab(id as any);
           }}
         />
       </div>
 
-      {/* Create Choice Modal */}
-      <Dialog open={showCreateChoice} onOpenChange={setShowCreateChoice}>
-        <DialogContent className="max-w-sm p-0 overflow-hidden rounded-[var(--radius-xl)]">
-          <div className="p-6 space-y-4">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-foreground">Create New</h2>
-              <p className="text-sm text-muted-foreground mt-1">What would you like to share?</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Post Option */}
-              <button
-                onClick={() => {
-                  setShowCreateChoice(false);
-                  setActiveTab('create');
-                }}
-                className="group flex flex-col items-center gap-3 p-6 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border border-border hover:border-primary/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                  <Image className="w-7 h-7 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-foreground">Post</p>
-                  <p className="text-xs text-muted-foreground">Share a photo</p>
-                </div>
-              </button>
-
-              {/* Reel Option */}
-              <button
-                onClick={() => {
-                  setShowCreateChoice(false);
-                  setIsCreateReelOpen(true);
-                }}
-                className="group flex flex-col items-center gap-3 p-6 rounded-[var(--radius-xl)] bg-accent/50 hover:bg-accent border border-border hover:border-primary/30 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#ed3d66] to-[#f97316] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                  <Video className="w-7 h-7 text-white" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-foreground">Reel</p>
-                  <p className="text-xs text-muted-foreground">Share a video</p>
-                </div>
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Highlight Creation Modal */}
       <Dialog open={showHighlightModal} onOpenChange={(open) => {
